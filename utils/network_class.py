@@ -58,6 +58,7 @@ class NetworkClass:
             Boundary_xx = xx_0, xx_1
             
             ## Query the existance of the path
+            breakpoint()
             path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
                                 for target in Boundary_xx[1])
         

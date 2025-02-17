@@ -1,2 +1,8 @@
-#pycache
+# pycache
 utils/__pycache__
+# Irrelevant files in Monotonic Folder
+Monotonic/*.dat
+Monotonic/*.in
+Monotonic/*.res
+Monotonic/log
+Monotonic/*.lammps

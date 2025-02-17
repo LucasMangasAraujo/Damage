@@ -6,301 +6,6 @@ from .network_class import NetworkClass, FillerNetworkClass
 from .loading import deformation_gradient
 from pathlib import Path
 
-def runsim_filler(geometry_file, model, params, dim, nFillers, filler_radius,
-                    filler_epsilon, stiffness_ratio, angle_model, angle_params,
-                    loading, stretch_array, stretch_increment, data_file):
-    """
-    Run full simulation.
-    
-    Inputs:
-        geometry_file (str):
-        model (str):
-        params (tuple):
-        dim (int):
-        nFillers (int):
-        filler_radius(float):
-        filler_epsilon(float):
-        stiffness_ratio (float):
-        angle_model (str):
-        angle_params(tuple):
-        loading (int):
-        stretch_array (ndarray):
-        stretch_increment (float):
-        data_file (str):
-        
-    Outputs:
-        stress_array (ndarray): Array with all the stress results
-    """
-    
-    # Unpack parameters tuple
-    bKuhn, NKuhn, nub3 = params
-    
-    # Relax as generated network
-    relax_as_generated_DN(geometry_file, model, params, dim)
-    DN_gen = NetworkClass("temp.dat", "test.res", "main.in")
-    computational_params = DN_gen.get_computational_params(params) ## extract computational params
-    
-    # Place fillers in the networ and assign bond types
-    Nodes, Bonds, bond_flags, Angles, angle_to_pair, Boundary, selected_nodes = pre.create_fillers(nFillers, filler_radius, filler_epsilon)
-    BondTypes, rest_lengths = pre.assign_bond_types(bond_flags, filler_radius, filler_epsilon, NKuhn, stiffness_ratio)
-    
-    # Write data file
-    pre.write_data_file(data_file, Nodes, Bonds, Angles, Boundary, BondTypes, model, 
-                            computational_params, rest_lengths ,angle_model, angle_params)
-    
-    # Initialise output array
-    stress_array = [] ## for now a list
-    
-    # Run relaxation step ...
-    print("Starting simulation for network in file %s..." %geometry_file)
-    print(100 * "=")
-    bond_coeffs_lines = []
-    
-    if model != '1':
-        ## When hybrid bond style is used, we need to store the bond coefficients
-        ## lines.
-        bond_coeff_lines = NetworkClass.get_bond_coeffs(data_file)
-    else:
-        ## Otherwise proceed stating an empty list
-        bond_coeff_lines = []
-    
-    run_relaxation_hybrid(dim, data_file, Boundary, model, angle_model, bond_coeff_lines)
-    DN = FillerNetworkClass(data_file, "test.res","main_hybrid.in") ## Netwotk object
-    cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-    stress_array.append(cauchy_stress)
-    radii_deviations = DN.get_filler_radii_deviations(bond_flags, selected_nodes, filler_radius)
-    angles_deviations, max_dev, min_dev = DN.get_filler_angles_deviations(angle_to_pair)
-    
-    # Check for overlaps and spheres that might have left the domain
-    is_overlaped_array = DN.any_filler_overlap(selected_nodes, filler_radius, filler_epsilon)
-    if np.any(is_overlaped_array):
-        print("Filler overlap occured!!")
-        breakpoint()
-    else:
-        print("No filler overlapping detected in relaxation step.")
-    initial_box = DN.get_box_lengths()
-    is_missing_array = DN.any_filler_missing(selected_nodes, initial_box, filler_epsilon)
-    
-    if np.any(is_missing_array):
-        print("There are missing fillers !!!!")
-        breakpoint()
-    else:
-        print("Missing fillers were not detected")
-    
-    
-    # ... and print initial information
-    print("F_11 = 1, F_22 = 1, F_33 = 1")
-    print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
-    print("max radii deviation is %g, while the min is %g" %(max(radii_deviations), min(radii_deviations)))
-    print("max avg deviation (in degrees) is %g, while the min one is %g" %(max_dev, min_dev) )
-    print(100 * "=")
-    
-    # Apply deformation history
-    for i in range(1, len(stretch_array)):
-        print(100 * "=")
-        
-        ## Run deformatio step
-        err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main_hybrid.in')
-        
-        ## Check for simulation errors.
-        if err:
-            breakpoint()
-        
-        ## Reconstruct data if needed
-        if model != '1':
-            post.rewrite_data_file(bond_coeff_lines, data_file)
-        
-        ## Calculate DN information
-        DN = FillerNetworkClass(data_file, "test.res","main_hybrid.in") ## Netwotk object
-        F = deformation_gradient(loading, stretch_array[i])
-        cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-        radii_deviations = DN.get_filler_radii_deviations(bond_flags, selected_nodes, filler_radius)
-        angles_deviations, max_dev, min_dev = DN.get_filler_angles_deviations(angle_to_pair)
-        
-        
-        ## Check for potential overlaps and missing fillers
-        is_overlaped_array = DN.any_filler_overlap(selected_nodes, filler_radius, filler_epsilon)
-        if np.any(is_overlaped_array):
-            print("Filler overlap occured!!")
-            breakpoint()
-        else:
-            print("No filler overlapping detected in current deformation step.")
-        
-        
-        ## Print currrent step data
-        print("F_11 = %g, F_22 = %g, F_33 = %g" %tuple(F))
-        print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
-        print("max radii deviation is %g, while the min is %g" %(max(radii_deviations), min(radii_deviations)))
-        print("max avg deviation (in degrees) is %g, while the min one is %g" %(max_dev, min_dev) )
-        
-        ## Append current stress to the stress array
-        stress_array.append(cauchy_stress)
-        print(100 * "=")
-        
-    print("Finished simulation for network in file %s!" %geometry_file)
-    print("\n\n")
-    
-    # Convert stress array to ndarray
-    stress_array = NetworkClass.render_stress_units(np.array(stress_array), bKuhn)
-    
-    return stress_array
-
-
-
-def runsim_filler_rep(geometry_file, model, params, dim, nFillers, filler_radius,
-                filler_epsilon, stiffness_ratio, angle_model, angle_params,
-                loading, stretch_array, stretch_increment, data_file, 
-                folder_names):
-    """
-    Run simulation for representative network.
-    
-    Inputs:
-        geometry_file (str):
-        model (str):
-        params (tuple):
-        dim (int):
-        nFillers (int):
-        filler_radius(float):
-        filler_epsilon(float):
-        stiffness_ratio (float):
-        angle_model (str):
-        angle_params(tuple):
-        loading (int):
-        stretch_array (ndarray):
-        stretch_increment (float):
-        data_file (str):
-        folder_names (tuple): sequence of strings containing the path to place the 
-                             data file.
-        
-    Outputs:
-        stress_array (ndarray): Array with all the stress results
-    """
-    
-    # Unpack parameters tuple
-    bKuhn, NKuhn, nub3 = params
-    
-    # Relax as generated network
-    relax_as_generated_DN(geometry_file, model, params, dim)
-    DN_gen = NetworkClass("temp.dat", "test.res", "main.in")
-    computational_params = DN_gen.get_computational_params(params) ## extract computational params
-    
-    # Place fillers in the networ and assign bond types
-    Nodes, Bonds, bond_flags, Angles, angle_to_pair, Boundary, selected_nodes = pre.create_fillers(nFillers, filler_radius, filler_epsilon)
-    BondTypes, rest_lengths = pre.assign_bond_types(bond_flags, filler_radius, filler_epsilon, NKuhn, stiffness_ratio)
-    
-    # Write data file
-    pre.write_data_file(data_file, Nodes, Bonds, Angles, Boundary, BondTypes, model, 
-                            computational_params, rest_lengths ,angle_model, angle_params)
-    
-    # Create folder to receive representative nets
-    rep_path = Path(*folder_names) ## create folder
-    rep_path.mkdir(parents = True, exist_ok = True)
-    
-    # Initialise output array
-    stress_array = [] ## for now a list
-    
-    # Run relaxation step ...
-    print("Starting simulation for network in file %s..." %geometry_file)
-    print(100 * "=")
-    
-    if model != '1':
-        ## When hybrid bond style is used, we need to store the bond coefficients
-        ## lines.
-        bond_coeff_lines = NetworkClass.get_bond_coeffs(data_file)
-    else:
-        ## Otherwise proceed stating an empty list
-        bond_coeff_lines = []
-    
-    run_relaxation_hybrid(dim, data_file, Boundary, model, angle_model, bond_coeff_lines)
-    DN = FillerNetworkClass(data_file, "test.res","main_hybrid.in") ## Netwotk object
-    cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-    stress_array.append(cauchy_stress)
-    radii_deviations = DN.get_filler_radii_deviations(bond_flags, selected_nodes, filler_radius)
-    angles_deviations, max_dev, min_dev = DN.get_filler_angles_deviations(angle_to_pair)
-    
-    # move current geometry to the corresponding folder...
-    current_data_file = "Step_0.dat"
-    os.system("cp %s %s" %(data_file, current_data_file))
-    os.system("mv %s %s" %(current_data_file, rep_path))
-    
-    # Check for overlaps and spheres that might have left the domain
-    is_overlaped_array = DN.any_filler_overlap(selected_nodes, filler_radius, filler_epsilon)
-    if np.any(is_overlaped_array):
-        print("Filler overlap occured!!")
-        breakpoint()
-    else:
-        print("No filler overlapping detected in relaxation step.")
-    initial_box = DN.get_box_lengths()
-    is_missing_array = DN.any_filler_missing(selected_nodes, initial_box, filler_epsilon)
-    
-    if np.any(is_missing_array):
-        print("There are missing fillers !!!!")
-        breakpoint()
-    else:
-        print("Missing fillers were not detected")
-    
-    
-    # ... and print initial information
-    print("F_11 = 1, F_22 = 1, F_33 = 1")
-    print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
-    print("max radii deviation is %g, while the min is %g" %(max(radii_deviations), min(radii_deviations)))
-    print("max avg deviation (in degrees) is %g, while the min one is %g" %(max_dev, min_dev) )
-    print(100 * "=")
-    
-    # Apply deformation history
-    for i in range(1, len(stretch_array)):
-        print(100 * "=")
-        
-        ## Run deformatio step
-        err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main_hybrid.in')
-        
-        ## Check for simulation errors.
-        if err:
-            breakpoint()
-        
-        ## Reconstruct data if needed
-        if model != '1':
-            post.rewrite_data_file(bond_coeff_lines, data_file)
-            
-        ## Calculate DN information
-        DN = FillerNetworkClass(data_file, "test.res","main_hybrid.in") ## Netwotk object
-        F = deformation_gradient(loading, stretch_array[i])
-        cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-        radii_deviations = DN.get_filler_radii_deviations(bond_flags, selected_nodes, filler_radius)
-        angles_deviations, max_dev, min_dev = DN.get_filler_angles_deviations(angle_to_pair)
-        
-        ## Move current data file
-        current_data_file = "Step_" + str(i) + ".dat"
-        os.system("cp %s %s" %(data_file, current_data_file))
-        os.system("mv %s %s" %(current_data_file, rep_path))
-        
-        ## Check for potential overlaps and missing fillers
-        is_overlaped_array = DN.any_filler_overlap(selected_nodes, filler_radius, filler_epsilon)
-        if np.any(is_overlaped_array):
-            print("Filler overlap occured!!")
-            breakpoint()
-        else:
-            print("No filler overlapping detected in current deformation step.")
-        
-        ## Print currrent step data
-        print("F_11 = %g, F_22 = %g, F_33 = %g" %tuple(F))
-        print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
-        print("max radii deviation is %g, while the min is %g" %(max(radii_deviations), min(radii_deviations)))
-        print("max avg deviation (in degrees) is %g, while the min one is %g" %(max_dev, min_dev) )
-        
-        ## Append current stress to the stress array
-        stress_array.append(cauchy_stress)
-        print(100 * "=")
-        
-    print("Finished simulation for network in file %s!" %geometry_file)
-    print("\n\n")
-    
-    # Convert stress array to ndarray
-    stress_array = NetworkClass.render_stress_units(np.array(stress_array), bKuhn)
-    
-    return stress_array
-
-
 
 def runsim(geometry_file, model, params, dim, loading, stretch_array, 
             stretch_increment):
@@ -320,20 +25,25 @@ def runsim(geometry_file, model, params, dim, loading, stretch_array,
         stress_array (ndarray): Array with all the stress results
     """
     
-    # Unpack parameters tuple
-    bKuhn, NKuhn, nub3 = params
+    # Unpack parameters tuple, which mighht vary depending of the chain model
+    # if int(model) <= 2:
+        # bKuhn, NKuhn, nub3 = params
+    # elif model == '4':
+        # bKuhn, NKuhn, nub3, critical_r_Nb, failure_type = params
     
     # Initialise output array
     stress_array = [] ## for now a list
-    
+    bKuhn, NKuhn, nub3, critical_r_Nb, failure_type = params
     # Relax as generated network
     print("Starting simulation for network in file %s, with no fillers..." %geometry_file)
     print(100 * "=")
     relax_as_generated_DN(geometry_file, model, params, dim)
     DN = NetworkClass("temp.dat", "test.res", "main.in")
-    computational_params = DN.get_computational_params(params) ## extract computational params
+    computational_params = DN.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
     cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
     stress_array.append(cauchy_stress)
+    path_exists = DN.any_path(failure_type)
+    breakpoint()
     
     # ... and print initial information
     print("F_11 = 1, F_22 = 1, F_33 = 1")
@@ -481,7 +191,8 @@ def relax_as_generated_DN(geometry_file, model, params, dim):
     rest_lengths = {idx: 0. for idx in Bonds.keys()} ## list of rest lengths (needed to write the data file)
     
     # Calculate computational Kuhh length
-    bKuhn, NKuhn, nub3 = params
+    # bKuhn, NKuhn, nub3 = params
+    bKuhn, NKuhn, nub3, critical_r_Nb, failure_type = params
     crosslinks = len(Nodes) - len(Boundary)
     computational_bKuhn = np.power(nub3 /(2 * crosslinks), 1/3)
     computational_params = (computational_bKuhn, NKuhn)
