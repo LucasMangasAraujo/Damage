@@ -28,6 +28,44 @@ class NetworkClass:
         self.dump_file = dump_file
         self.input_file = input_file
     
+    
+    def any_path(self, failure_type):
+        """
+        Find if there is a path spanning the network.
+        
+        Inputs:
+            failure_type (int): failure criterion.
+                    1: path spanning the loading direction (assumed direction 1).
+                
+                
+        Outputs
+            path_exists (bool): True if at least one path was found.
+            
+        """
+        # Extract current coordinates of the nodes
+        Nodes, _ = self.get_nodes_and_bonds()
+        
+        # Create graph object representing the network
+        G = self.create_DN_graph()
+        
+        # Get ids of boundary nodes
+        Boundary = self.get_boundary()
+        
+        if failure_type == 1:
+            ## Find to which nodes are on the xx plane
+            xx_0 = [node for node in Boundary if np.isclose(Nodes[node][0], 0)] ## plane x = 0
+            xx_1 = [node for node in Boundary if np.isclose(Nodes[node][0], 1)] ## plane x = 1
+            Boundary_xx = xx_0, xx_1
+            
+            ## Query the existance of the path
+            path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
+                                for target in Boundary_xx[1])
+        
+        
+        
+        return path_exists
+    
+    
     @staticmethod
     def get_bond_coeffs(data_file):
         """
