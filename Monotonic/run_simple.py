@@ -3,12 +3,14 @@ sys.path.append("..//")
 from utils.network_class import NetworkClass
 from utils.loading import create_monotonic_load, get_loading_style
 import utils.sim_executor as sim
+import utils.post_processing as post
 
 def main():
     
     # Declare file containing geometry, and name of data file
     geometry_file = '..//Geometries//4000_nodes.txt'
     data_file = "DN.dat"
+    nRepeats = 1
     
     # Declare chain parameters
     bKuhn, NKuhn = (1, 400)## Kuhn length (nm) and Number of Kuhn segments
@@ -24,10 +26,17 @@ def main():
     loading = 1
     stretch_increment = 0.5
     
-    stress = sim.runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
-                                failure_criterion, data_file)
+    # Run simulations for the specified number of repeats
+    results_dict = {}
+    for i in range(0, nRepeats):
+        ## Run full simulation
+        out = sim.runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
+                                    failure_criterion, data_file)
+        ## store simulation results in dict
+        results_dict[i + 1] = out
     
-    
+    # After completion average results
+    averaged_results = post.average_fracture_results(results_dict, loading)
     breakpoint()
     return
 

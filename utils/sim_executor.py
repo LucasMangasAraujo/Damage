@@ -92,10 +92,23 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
             ## Initialise DN object
             DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
         
+        ## Check if scissions ocurred, and if yes, relax the network
+        nBonds = len(DN.get_nodes_and_bonds()[1])
+        scission_detected = nBonds < initial_nBonds
+        if scission_detected:
+            print("Scissions detected, perfoming relaxation until no more scisison are detected")
+            while scission_detected:
+                ## relax network
+                err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
+                
+                ## update DN object
+                DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+                temp = len(DN.get_nodes_and_bonds()[1])
+                scission_detected = temp < nBonds
+        
         ## Calculate stresses
         cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-        nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
-        nBonds = len(DN.get_nodes_and_bonds()[1])
+        nominal_stress = NetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
         
         ## Append current stress to the stress array
         cauchy_stress_array.append(cauchy_stress)
@@ -121,13 +134,16 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
         
         print(100 * "=")
         
-    breakpoint()
+    
     print("Finished simulation for network in file %s!" %geometry_file)
     
     # Convert stress array to ndarray
-    stress_array = NetworkClass.render_stress_units(np.array(stress_array), bKuhn)
+    cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
+    nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     
-    return stress_array
+    out = np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), np.array(fraction_broken_chains)
+    
+    return out
 
 
 

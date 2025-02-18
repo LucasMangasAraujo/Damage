@@ -7,6 +7,117 @@ from scipy.spatial import KDTree
 from pathlib import Path
 from collections import defaultdict
 
+def average_fracture_results(results_dict, loading):
+    """
+    Average the results coming from simulations with determistic
+    chain scission. Note this function is also valid for simulations
+    with one repeat.
+    
+    Each value of the dict is formed by a tuple containing ndarrays
+    containing information in the following order.
+        stretch: value of applied stretch.
+        cauchy stress: rubbery components of stress.
+        nominal stress: nominal components of stress
+        fraction_broken_links: self explanatory.
+    
+    Inputs:
+        results_dict (dict): results of the simulation of each repeat.
+        loading (int): Type of loading used.
+    """
+    
+    # Check if representative simulation was perfomed
+    not_one_repeat = len(results_dict.keys()) > 1
+    
+    # Perform analysis depending on the type of simulation that was done.
+    if not_one_repeat:
+        ## under dev
+        breakpoint()
+    else:
+        ## No need for averaging.
+        stretch_array = results_dict[1][0]
+        cauchy_rubbery = results_dict[1][1]
+        nominal_rubbery = results_dict[1][2]
+        fraction_broken_chains = results_dict[1][3]
+        
+        ## Calculate full stress depending on the loading conditions.
+        cauchy_stress, nominal_stress = full_stress(stretch_array, cauchy_rubbery, 
+                                                        nominal_rubbery, loading)
+        
+        ## Assemble output
+        averaged_results = stretch_array, cauchy_stress, nominal_stress, fraction_broken_chains
+        
+    
+    
+    return averaged_results
+
+
+def full_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
+    """
+    Obtain the non-zero stress component based on the BCx.
+    
+    Inputs:
+        stretch_array (ndarray): array with the driving stretches.
+        cauchy_rubbery (ndarray): rubbery cauchy stress components
+        nominal_rubbery (ndarray): rubbery nominal stress components
+        loading (int): type of loading.
+                1: uniaxial tension
+                2: equi-axial tension
+                3: pure shear
+    
+    Outputs:
+        cauchy_stress (ndarray): non-zero cauchy principal stress.
+        nominal_stress (ndarray): non-zero nominal principal stress.
+    """
+    # Array initialisation
+    cauchy_stress = np.zeros(len(cauchy_rubbery), )
+    nominal_stress = np.zeros(len(nominal_rubbery), )
+    
+    # Apply boundary conditions
+    if loading == 1: 
+        ## Obtain Lagrange multiplierand calculate cauchy stress
+        Lagrange_multiplier = np.mean(cauchy_rubbery[:, 1:], axis = 1)
+        cauchy_stress = cauchy_rubbery[:, 0] - Lagrange_multiplier
+        
+        ## Calculate the nominal stress
+        nominal_stress = nominal_rubbery[:, 0] - (Lagrange_multiplier / stretch_array)
+        
+    
+    
+    return cauchy_stress, nominal_stress
+
+
+def write_results(folder_names, results_file, results_comments, results):
+    """
+    Write results data to results file to folder.
+    
+    Inputs:
+        folder_names (tuple): tuple containing folder names in descending order
+        results_file (string): file.extenstion containing the results. .csv files are
+                               prefered.
+        results_comments(string): comments displayed in the header of the file
+        results (tuple or list): iterable containing the results data.
+        
+    Outputs:
+        None
+    """
+    
+    # Check if folder containing results exists
+    results_path = Path(*folder_names) ## create folder
+    results_path.mkdir(parents = True, exist_ok = True) ## check if folder exists, and create it if not
+    
+    # Organise data into a ndarray
+    results_matrix = np.column_stack([np.array(result) for result in results])
+    
+    #  Save data to file
+    np.savetxt(results_path / results_file, results_matrix, delimiter = ',', 
+                    header = results_comments)
+    
+    return
+
+
+
+
+
 def rewrite_data_file(bond_coeffs_lines, data_file):
     """
     Rewrite data file when hybrid bond style is used, as LAMMPS 
@@ -32,18 +143,6 @@ def rewrite_data_file(bond_coeffs_lines, data_file):
     
     return
 
-
-def current_filler_radius(Nodes, filler_bonds, idx_of_central_node):
-    """
-    Obtain current radius of filler
-    """
-
-    
-    # Iterated over selected bonds list
-    for (n1, n2) in selected_bonds:
-        breakpoint()
-    
-    return current_radius
 
 def check_angles(DN, central_node_idx):
     """
@@ -116,76 +215,6 @@ def bondPair_triplet_map(filtered_Bonds, Angles):
     return bondPair_to_triplet
 
 
-def write_results(folder_names, results_file, results_comments, results):
-    """
-    Write results data to results file to folder.
-    
-    Inputs:
-        folder_names (tuple): tuple containing folder names in descending order
-        results_file (string): file.extenstion containing the results. .csv files are
-                               prefered.
-        results_comments(string): comments displayed in the header of the file
-        results (tuple or list): iterable containing the results data.
-        
-    Outputs:
-        None
-    """
-    
-    # Check if folder containing results exists
-    results_path = Path(*folder_names) ## create folder
-    results_path.mkdir(parents = True, exist_ok = True) ## check if folder exists, and create it if not
-    
-    # Organise data into a ndarray
-    results_matrix = np.column_stack([np.array(result) for result in results])
-    
-    #  Save data to file
-    np.savetxt(results_path / results_file, results_matrix, delimiter = ',', 
-                    header = results_comments)
-    
-    return
-
-
-def check_sphere(DN, initial_radius, central_node_idx):
-    """
-    Check how the sphere representing the filler changed with deformation
-    """
-    # Query information about the DN
-    Nodes, Bonds = DN.get_nodes_and_bonds()
-    
-    # Get information idx of links forming the sphere
-    idx_bonds_in_sphere = find_links_in_sphere(Bonds, central_node_idx)
-    
-    # Calculate average distance of bonds in the sphere
-    centre_to_point_distances = [];
-    for idx in idx_bonds_in_sphere:
-        n1, n2 = Bonds[idx]
-        vector = Nodes[n1] - Nodes[n2]
-        centre_to_point_distances.append(np.linalg.norm(vector))
-        
-    current_radius = np.mean(centre_to_point_distances)
-    
-    # Compate difference
-    radius_ratio = current_radius / initial_radius
-    
-    return radius_ratio
-
-
-def find_links_in_sphere(Bonds, central_node_idx):
-    """
-    Find from the dict of bonds which ones are within the sphere
-    
-    Inputs:
-        Bonds (dict): Pair of tuples containing pair of nodes connected
-        central_node_idx (int): id of central node.
-        
-    Outputs:
-        idx_bonds_in_sphere (tuple): ids of bonds forming the sphere
-    """
-    # Iterate over bonds and check if bond contains the central node
-    idx_bonds_in_sphere = [idx for idx, bond in Bonds.items() if central_node_idx in bond]
-    
-    
-    return idx_bonds_in_sphere
 
 
 
