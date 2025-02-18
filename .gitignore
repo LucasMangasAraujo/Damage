@@ -1,5 +1,5 @@
 # pycache
-utils/__pycache__
+utils/__pycache__/
 # Irrelevant files in Monotonic Folder
 Monotonic/*.dat
 Monotonic/*.in

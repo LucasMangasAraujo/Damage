@@ -14,20 +14,18 @@ def main():
     bKuhn, NKuhn = (1, 400)## Kuhn length (nm) and Number of Kuhn segments
     nu = 1e-3 ## chain density in #chains/nm3
     nub3 = nu * pow(bKuhn, 3); ## normalised (via Kuhn length) chain density
-    critical_r_Nb = 0.95 ## fraction of the contour length where scission happens
-    failure_type = 1
-    params = (bKuhn, NKuhn, nub3, critical_r_Nb, failure_type)
-    model = '2' ## chain model 
+    critical_r_Nb = 0.15 ## fraction of the contour length where scission happens
+    failure_criterion = 1
+    params = (bKuhn, NKuhn, nub3, critical_r_Nb)
+    model = '4' ## chain model 
     dim = 3 ## problem dimension
     
     # Define load history
     loading = 1
-    max_stretch = 5
-    increments = 10
-    stretch_array, stretch_increment = create_monotonic_load(max_stretch, increments)
+    stretch_increment = 0.5
     
-    stress = sim.runsim(geometry_file, model, params, dim, loading, stretch_array, 
-                        stretch_increment)
+    stress = sim.runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
+                                failure_criterion, data_file)
     
     
     breakpoint()

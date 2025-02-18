@@ -29,12 +29,12 @@ class NetworkClass:
         self.input_file = input_file
     
     
-    def any_path(self, failure_type):
+    def any_path(self, failure_criterion, initial_Nodes):
         """
         Find if there is a path spanning the network.
         
         Inputs:
-            failure_type (int): failure criterion.
+            failure_criterion (int): failure criterion.
                     1: path spanning the loading direction (assumed direction 1).
                 
                 
@@ -42,25 +42,22 @@ class NetworkClass:
             path_exists (bool): True if at least one path was found.
             
         """
-        # Extract current coordinates of the nodes
-        Nodes, _ = self.get_nodes_and_bonds()
-        
         # Create graph object representing the network
         G = self.create_DN_graph()
         
         # Get ids of boundary nodes
         Boundary = self.get_boundary()
         
-        if failure_type == 1:
+        if failure_criterion == 1:
             ## Find to which nodes are on the xx plane
-            xx_0 = [node for node in Boundary if np.isclose(Nodes[node][0], 0)] ## plane x = 0
-            xx_1 = [node for node in Boundary if np.isclose(Nodes[node][0], 1)] ## plane x = 1
+            xx_0 = [node for node in Boundary if np.isclose(initial_Nodes[node][0], 0)] ## plane x = 0
+            xx_1 = [node for node in Boundary if np.isclose(initial_Nodes[node][0], 1)] ## plane x = 1
             Boundary_xx = xx_0, xx_1
             
             ## Query the existance of the path
-            breakpoint()
             path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
                                 for target in Boundary_xx[1])
+            if not path_exists: breakpoint()
         
         
         
@@ -300,7 +297,7 @@ class NetworkClass:
     
     def calculate_stress(self, dim):
         """
-        Calculate stress using virtual work.
+        Calculate  cauchy stress using virtual work principle.
         
         Inputs:
             dim (int): problem dimension
@@ -342,6 +339,30 @@ class NetworkClass:
                 data = f.readline().split()
 
         return S
+    
+    
+    @staticmethod
+    def calculate_nominal_stress(dim, F, cauchy_stress):
+        """
+        Calculate nominal stress stress using the virtual work principle.
+        
+        Inputs:
+            dim (int): problem dimension
+            F (ndarray): deformation gradient
+        
+        Outputs:
+            S (ndarray): 3x1 array with the principal stresses
+        """
+        # Assemble F^{-T} in the principal space
+        F_minusT = np.array([1/stretch for stretch in F])
+        
+        # Use regular relation to obtain the nominal stress
+        nominal = np.zeros(3)
+        nominal = cauchy_stress * F_minusT
+        
+        return nominal
+    
+    
     
     @staticmethod
     def render_stress_units(stress_array, bKuhn, T = 298):

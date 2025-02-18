@@ -929,8 +929,12 @@ def writePositions(filename, Nodes, Bonds, Boundary, BondTypes, model, params, r
                     rest_length = params[2];
                     f.write('1 %g %g\n'%(kappa, rest_length)); ## zero rest length
                 
-            elif model == '2' or model == '4': ## FJC or breakable FJC
+            elif model == '2': ## FJC or breakable FJC
                 f.write('1 %g %g\n' %(bKuhn, N));
+                
+            elif model == '4':
+                critical_r_Nb = params[-1]
+                f.write("1 %g %g %g" %(bKuhn, N, critical_r_Nb))
             
             elif model == '3': ## Extensible FJC
                 bKuhn, Eb, critical_eng = tuple(params);

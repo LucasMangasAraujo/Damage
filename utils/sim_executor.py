@@ -7,6 +7,131 @@ from .loading import deformation_gradient
 from pathlib import Path
 
 
+def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment, 
+                    failure_criterion, data_file):
+    """
+    Run full simulation for DN where on-and-off scissions are allowed to 
+    happen. We run the simulation until failure is detected
+    
+    Inputs:
+        geometry_file (str):
+        model (str):
+        params (tuple):
+        dim (int):
+        loading (int):
+        stretch_array (ndarray):
+        stretch_increment (float):
+        failure_criterion (int): 
+        
+    Outputs:
+        stress_array (ndarray): Array with all the stress results
+    """
+    
+    # Unpack parameters tuple, which mighht vary depending of the chain model
+    if int(model) == 4:
+        bKuhn, NKuhn, nub3, critical_r_Nb = params
+    
+    # Initialise output array
+    stretch_array = []
+    cauchy_stress_array = [] ## for now a list
+    nominal_stress_array = [] ## for now a list
+    fraction_broken_chains = []
+    i = 0 ## increment counter
+    
+    # Relax as generated network
+    print("Starting simulation for network in file %s, with no fillers..." %geometry_file)
+    print(100 * "=")
+    relax_as_generated_DN(geometry_file, model, params, dim, data_file)
+    
+    # Create initial DN object
+    DN_initial = NetworkClass(data_file, "test.res", "main.in") ## reference configuration
+    computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
+    cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
+    nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+    
+    # Get initial number of nodes and initial coordinates
+    initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
+    initial_nBonds = len(initial_Bonds) 
+    
+    # Append initial information
+    stretch_array.append(1.)
+    cauchy_stress_array.append(cauchy_stress)
+    nominal_stress_array.append(nominal_stress)
+    
+    # Query for initial failure
+    path_exists = DN_initial.any_path(failure_criterion, initial_Nodes)
+    
+    # ... and print initial information
+    print("F_11 = 1, F_22 = 1, F_33 = 1")
+    print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
+    print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
+    if path_exists:
+        print("No connectivity issues found in the reference configuration, proceed")
+        fraction_broken_chains.append(0.)
+    else:
+        print("Connectivity problems found, aborting simulation")
+    print(100 * "=")
+    
+    # Apply deformation until failure is detected
+    while path_exists:
+        print(100 * "=")
+        ## Run deformatio step
+        i += 1
+        err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main.in')
+        
+        ## Check if simulation was aborted
+        if err:
+            print("Increment failed")
+            i -= 1
+            break
+        else:
+            ## Calculate current deformatio gradient
+            F = deformation_gradient(loading, stretch_array[i - 1] + stretch_increment)
+            stretch_array.append(F[0])
+            
+            ## Initialise DN object
+            DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+        
+        ## Calculate stresses
+        cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
+        nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+        nBonds = len(DN.get_nodes_and_bonds()[1])
+        
+        ## Append current stress to the stress array
+        cauchy_stress_array.append(cauchy_stress)
+        nominal_stress_array.append(nominal_stress)
+        
+        ## Print currrent step data
+        print("F_11 = %g, F_22 = %g, F_33 = %g" %tuple(F))
+        print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
+        print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
+        
+        ## Asses if failure occurred
+        nBonds = len(DN.get_nodes_and_bonds()[1]) 
+        fraction_broken_chains.append((initial_nBonds - nBonds) / initial_nBonds)
+        path_exists = DN.any_path(failure_criterion, initial_Nodes)
+        if path_exists:
+            print("Failure not detected. Move to next increment")
+            print("%g percent of chains are broken" %(100 * fraction_broken_chains[-1]))
+        else:
+            print("Failure detected at increment %d" %i)
+            print("Failure occurred with %g percent of broken chains" %(100 * fraction_broken_chains[-1]))
+            print("Breaking simulation")
+            break
+        
+        print(100 * "=")
+        
+    breakpoint()
+    print("Finished simulation for network in file %s!" %geometry_file)
+    
+    # Convert stress array to ndarray
+    stress_array = NetworkClass.render_stress_units(np.array(stress_array), bKuhn)
+    
+    return stress_array
+
+
+
+
 def runsim(geometry_file, model, params, dim, loading, stretch_array, 
             stretch_increment):
     """
@@ -26,14 +151,12 @@ def runsim(geometry_file, model, params, dim, loading, stretch_array,
     """
     
     # Unpack parameters tuple, which mighht vary depending of the chain model
-    # if int(model) <= 2:
-        # bKuhn, NKuhn, nub3 = params
-    # elif model == '4':
-        # bKuhn, NKuhn, nub3, critical_r_Nb, failure_type = params
+    bKuhn, NKuhn, nub3 = params
     
     # Initialise output array
     stress_array = [] ## for now a list
-    bKuhn, NKuhn, nub3, critical_r_Nb, failure_type = params
+    bKuhn, NKuhn, nub3 = params
+    
     # Relax as generated network
     print("Starting simulation for network in file %s, with no fillers..." %geometry_file)
     print(100 * "=")
@@ -42,7 +165,6 @@ def runsim(geometry_file, model, params, dim, loading, stretch_array,
     computational_params = DN.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
     cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
     stress_array.append(cauchy_stress)
-    path_exists = DN.any_path(failure_type)
     breakpoint()
     
     # ... and print initial information
@@ -167,7 +289,8 @@ def runsim_rep(geometry_file, model, params, dim, loading, stretch_array,
 
 
 
-def relax_as_generated_DN(geometry_file, model, params, dim):
+def relax_as_generated_DN(geometry_file, model, params, dim, temp_file, 
+                                multiple_chain_types = False):
     """
     Perform relaxation on as generated network
     
@@ -182,24 +305,29 @@ def relax_as_generated_DN(geometry_file, model, params, dim):
     Outputs:
         None
     """
-    # Import relevant modules
-    #from .pre_processing import readGeometry, writePositions
-    
+    # Unpack tuple based on the model used
+    if int(model) <= 2:
+        bKuhn, NKuhn, nub3 = params
+    elif int(model) == 4:
+        bKuhn, NKuhn, nub3, critical_r_Nb = params
     
     # Extract Nodes, Bonds, Boudnary and BondTypes
     Nodes, Bonds, Boundary, BondTypes = pre.readGeometry(geometry_file)
     rest_lengths = {idx: 0. for idx in Bonds.keys()} ## list of rest lengths (needed to write the data file)
     
     # Calculate computational Kuhh length
-    # bKuhn, NKuhn, nub3 = params
-    bKuhn, NKuhn, nub3, critical_r_Nb, failure_type = params
     crosslinks = len(Nodes) - len(Boundary)
     computational_bKuhn = np.power(nub3 /(2 * crosslinks), 1/3)
-    computational_params = (computational_bKuhn, NKuhn)
-    BondTypes = {idx: NKuhn for idx in BondTypes.keys()}
+    
+    if int(model) <= 2:
+        computational_params = (computational_bKuhn, NKuhn)
+    elif int(model) == 4:
+        computational_params = (computational_bKuhn, NKuhn, critical_r_Nb)
+        
+    if not multiple_chain_types:
+        BondTypes = {idx: NKuhn for idx in BondTypes.keys()}
     
     # Write data file
-    temp_file = "temp.dat"
     pre.writePositions(temp_file, Nodes, Bonds, Boundary, BondTypes, model, computational_params, rest_lengths)
     
     # Run relaxation
@@ -231,24 +359,6 @@ def run_relaxation_hybrid(dim, temp_file, Boundary, model, angle_model, bond_coe
     if model != '1':
         from .post_processing import rewrite_data_file
         rewrite_data_file(bond_coeff_lines, temp_file)
-    
-    return
-
-
-def run_relaxation_angles(dim, temp_file, Boundary, model, angle_model):
-    """
-        This code runs the relaxation considering angle hinderence 
-    """
-    # Generate input files for LAMMPS
-    mainfile = 'main_angles.in'
-    posfile = temp_file 
-    
-    # Write initial position and main file for LAMMPS
-    write_main_angles(mainfile,posfile,Boundary,dim,model,angle_model)
-    
-    
-    #reference configuration: run with zero applied displacement
-    err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = mainfile);
     
     return
 
