@@ -110,7 +110,7 @@ class NetworkClass:
         Inputs:
             failure_criterion (int): failure criterion.
                     1: path spanning the loading direction (assumed direction 1).
-                
+            initial_Nodes (dict): reference position of the nodes
                 
         Outputs
             path_exists (bool): True if at least one path was found.
@@ -133,7 +133,6 @@ class NetworkClass:
             ## Find to which nodes are on the xx plane
             xx_0 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 0)] ## plane x = 0
             xx_1 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 1)] ## plane x = 1
-            #Boundary_xx = xx_0, xx_1
             
             ## Get connected components of the current graph
             components = list(nx.connected_components(G))
@@ -142,11 +141,6 @@ class NetworkClass:
                     path_exists = True
                     return path_exists
             
-            
-            ## Query the existance of the path
-            # path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
-                                # for target in Boundary_xx[1])
-            #if not path_exists: breakpoint()
         
         
         

@@ -100,11 +100,17 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
             while scission_detected:
                 ## relax network
                 err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
-                
+                if not err:
+                    print("relaxation completed")
                 ## update DN object
                 DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
                 temp = len(DN.get_nodes_and_bonds()[1])
                 scission_detected = temp < nBonds
+                print("nChains pre-relaxation: %d" %nBonds)
+                print("nChains after-relaxation: %d" %temp)
+                nBonds = temp
+                if scission_detected:
+                    print("Doing another relaxation, as scissions were still detected")
         
         ## Calculate stresses
         cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
@@ -148,8 +154,7 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
 
 
 
-def runsim(geometry_file, model, params, dim, loading, stretch_array, 
-            stretch_increment):
+def runsim(geometry_file, model, params, dim, loading, stretch_increments, data_file):
     """
     Run full simulation for DN with no fillers.
     
@@ -159,7 +164,6 @@ def runsim(geometry_file, model, params, dim, loading, stretch_array,
         params (tuple):
         dim (int):
         loading (int):
-        stretch_array (ndarray):
         stretch_increment (float):
         
     Outputs:
@@ -170,53 +174,71 @@ def runsim(geometry_file, model, params, dim, loading, stretch_array,
     bKuhn, NKuhn, nub3 = params
     
     # Initialise output array
-    stress_array = [] ## for now a list
-    bKuhn, NKuhn, nub3 = params
+    stretch_array = []
+    cauchy_stress_array = [] ## for now a list
+    nominal_stress_array = [] ## for now a list
     
     # Relax as generated network
     print("Starting simulation for network in file %s, with no fillers..." %geometry_file)
     print(100 * "=")
-    relax_as_generated_DN(geometry_file, model, params, dim)
-    DN = NetworkClass("temp.dat", "test.res", "main.in")
-    computational_params = DN.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
-    cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-    stress_array.append(cauchy_stress)
-    breakpoint()
+    relax_as_generated_DN(geometry_file, model, params, dim, data_file)
+    
+    # Create initial DN object
+    DN_initial = NetworkClass(data_file, "test.res", "main.in") ## reference configuration
+    computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
+    cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
+    nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+    
+    # Append initial information
+    stretch_array.append(1.)
+    cauchy_stress_array.append(cauchy_stress)
+    nominal_stress_array.append(nominal_stress)
     
     # ... and print initial information
     print("F_11 = 1, F_22 = 1, F_33 = 1")
     print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
+    print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
     print(100 * "=")
     
     # Apply deformation history
-    for i in range(1, len(stretch_array)):
+    for i, stretch_increment in enumerate(stretch_increments):
         print(100 * "=")
         ## Run deformatio step
-        runinc(loading, i + 1, stretch_increment, dim, main_file = 'main.in')
+        err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main.in')
         
-        ## Reconstruct data if needed
-        if model != '1':
-            breakpoint()
-        
-        ## Calculate DN information
-        DN = NetworkClass("temp.dat", "test.res","main_hybrid.in") ## Netwotk object
-        F = deformation_gradient(loading, stretch_array[i])
+        if err:
+            print("Locking issues with chains, trying, with reduces increment")
+            break
+        else:
+            F = deformation_gradient(loading, stretch_array[-1] + stretch_increment)
+            stretch_array.append(F[0])
+            DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            
+        ## Calculate stresses
         cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
+        nominal_stress = NetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
+        
+        ## Append current stress to the stress array
+        cauchy_stress_array.append(cauchy_stress)
+        nominal_stress_array.append(nominal_stress)
         
         ## Print currrent step data
         print("F_11 = %g, F_22 = %g, F_33 = %g" %tuple(F))
         print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
+        print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
         
         ## Append current stress to the stress array
-        stress_array.append(cauchy_stress)
         print(100 * "=")
         
     print("Finished simulation for network in file %s!" %geometry_file)
     
     # Convert stress array to ndarray
-    stress_array = NetworkClass.render_stress_units(np.array(stress_array), bKuhn)
+    cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
+    nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     
-    return stress_array
+    out = np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array)
+    
+    return out
 
 
 
@@ -382,11 +404,13 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     os.system("mv %s %s" %(current_data_file, rep_path))
     
     # Apply deformation until failure is detected
+    current_inc = stretch_increment
+    inc_reduction_factor = 1
     while path_exists:
         print(100 * "=")
         ## Run deformatio step
         i += 1
-        err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main.in')
+        err = runinc(loading, i + 1, current_inc, dim, main_file = 'main.in')
         
         ## Check if simulation was aborted
         if err:
@@ -395,7 +419,7 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
             break
         else:
             ## Calculate current deformatio gradient
-            F = deformation_gradient(loading, stretch_array[i - 1] + stretch_increment)
+            F = deformation_gradient(loading, stretch_array[i - 1] + current_inc)
             stretch_array.append(F[0])
             
             ## Initialise DN object
@@ -406,6 +430,8 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
         scission_detected = nBonds < initial_nBonds
         if scission_detected:
             print("Scissions detected, perfoming relaxation until no more scisison are detected")
+            print("Stretch increment reduced from %g to %g" %(current_inc, current_inc * inc_reduction_factor))
+            current_inc *= inc_reduction_factor
             while scission_detected:
                 ## relax network
                 err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
