@@ -29,6 +29,80 @@ class NetworkClass:
         self.input_file = input_file
     
     
+    def remove_ineffective_clusters(self, G):
+        """
+        """
+        # Get current positions of the nodes
+        Nodes, _ = self.get_nodes_and_bonds()
+        
+        # Get connected components of the graph
+        connected_components = list(nx.connected_components(G))
+        
+        # Removed the connected components that are coiled
+        ineffective_clusters_ids = []
+        for i, component in enumerate(connected_components):
+            subG = G.subgraph(component)
+            sub_edges = list(subG.edges)
+            subG_distances = []
+            
+            for bond in sub_edges:
+                n1, n2 = bond
+                dist = np.linalg.norm(Nodes[n1] - Nodes[n2])
+                subG_distances.append(dist)
+            
+            ## check if all distances are close to zero
+            is_coiled = np.all(np.array(subG_distances) < 1e-6)
+            if is_coiled:
+                ineffective_clusters_ids.append(i)
+        
+        # With ids of the ineffective clusters, remove them from the graph
+        for i in ineffective_clusters_ids:
+            G.remove_nodes_from(connected_components[i])
+        
+        return
+    
+    
+    def simplified_graph(self, Boundary):
+        """
+        Simplify the DN graph, removing nodes that do not contribute
+        for the "propagation" of information.
+        
+        Inputs:
+            Boundary (set): ids of boundary nodes
+            
+        Outputs:
+            simplified_G (networx graph): simplified graph
+            
+        """
+        # Create graph object
+        simplified_G = self.create_DN_graph()
+        
+        # Find out which nodes have degree zero or one
+        flag = True
+        while flag:
+            ## Find out which nodes have degree one or zero
+            nodes_of_interest = set()
+            for node in simplified_G.nodes():
+                if simplified_G.degree(node) == 0 or simplified_G.degree(node) == 1:
+                    nodes_of_interest.add(node)
+                    
+            ## Remove boundary nodes from the nodes of interest
+            selected_nodes = nodes_of_interest.difference(Boundary)
+            if not len(selected_nodes) > 0:
+                break
+                
+            ## Remove now node and edges associated with the selected nodes (if not empty)
+            for node in selected_nodes:
+                simplified_G.remove_node(node)
+            
+        
+        # Remove clusters that are coiled
+        self.remove_ineffective_clusters(simplified_G)
+        
+        
+        return simplified_G
+    
+    
     def any_path(self, failure_criterion, initial_Nodes):
         """
         Find if there is a path spanning the network.
@@ -42,21 +116,36 @@ class NetworkClass:
             path_exists (bool): True if at least one path was found.
             
         """
-        # Create graph object representing the network
-        G = self.create_DN_graph()
         
         # Get ids of boundary nodes
-        Boundary = self.get_boundary()
+        Boundary = set(self.get_boundary())
         
+        # Creat simplified graph object
+        G = self.simplified_graph(set(Boundary))
+        
+        # Remove nodes that are in the boundary but not in the graph anymore
+        G_nodes = set(G.nodes())
+        filtered_Boundary = Boundary.intersection(G_nodes)
+        path_exists = False ## asume path does not exists
+        
+        # Analyse if failure ocurred
         if failure_criterion == 1:
             ## Find to which nodes are on the xx plane
-            xx_0 = [node for node in Boundary if np.isclose(initial_Nodes[node][0], 0)] ## plane x = 0
-            xx_1 = [node for node in Boundary if np.isclose(initial_Nodes[node][0], 1)] ## plane x = 1
-            Boundary_xx = xx_0, xx_1
+            xx_0 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 0)] ## plane x = 0
+            xx_1 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 1)] ## plane x = 1
+            #Boundary_xx = xx_0, xx_1
+            
+            ## Get connected components of the current graph
+            components = list(nx.connected_components(G))
+            for component in components:
+                if any(n in component for n in xx_0) and any(n in component for n in xx_1):
+                    path_exists = True
+                    return path_exists
+            
             
             ## Query the existance of the path
-            path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
-                                for target in Boundary_xx[1])
+            # path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
+                                # for target in Boundary_xx[1])
             #if not path_exists: breakpoint()
         
         
