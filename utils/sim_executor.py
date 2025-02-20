@@ -2,7 +2,7 @@ import numpy as np
 import os
 import utils.pre_processing as pre
 import utils.post_processing as post
-from .network_class import NetworkClass, FillerNetworkClass
+from .network_class import NetworkClass, FracNetworkClass
 from .loading import deformation_gradient
 from pathlib import Path
 
@@ -44,7 +44,7 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
     relax_as_generated_DN(geometry_file, model, params, dim, data_file)
     
     # Create initial DN object
-    DN_initial = NetworkClass(data_file, "test.res", "main.in") ## reference configuration
+    DN_initial = FracNetworkClass(data_file, "test.res", "main.in") ## reference configuration
     computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
     cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
     nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
@@ -90,7 +90,7 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
             stretch_array.append(F[0])
             
             ## Initialise DN object
-            DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
         
         ## Check if scissions ocurred, and if yes, relax the network
         nBonds = len(DN.get_nodes_and_bonds()[1])
@@ -102,7 +102,7 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
                 err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
                 
                 ## update DN object
-                DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+                DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
                 temp = len(DN.get_nodes_and_bonds()[1])
                 scission_detected = temp < nBonds
         
@@ -521,7 +521,7 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     relax_multi(geometry_file, model, params, dim, data_file, strengths, strong_fraction)
     
     # Create initial DN object
-    DN_initial = NetworkClass(data_file, "test.res", "main.in") ## reference configuration
+    DN_initial = FracNetworkClass(data_file, "test.res", "main.in") ## reference configuration
     computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
     cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
     nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
@@ -572,7 +572,7 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
             stretch_array.append(F[0])
             
             ## Initialise DN object
-            DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
         
         ## Check if scissions ocurred, and if yes, relax the network
         nBonds = len(DN.get_nodes_and_bonds()[1])
@@ -585,7 +585,7 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
                 if not err:
                     print("relaxation completed")
                 ## update DN object
-                DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+                DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
                 temp = len(DN.get_nodes_and_bonds()[1])
                 scission_detected = temp < nBonds
                 print("nChains pre-relaxation: %d" %nBonds)

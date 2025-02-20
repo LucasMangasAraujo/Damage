@@ -7,7 +7,6 @@ strength.
 
 import sys, os 
 sys.path.append("..//")
-from utils.network_class import NetworkClass
 from utils.loading import create_monotonic_load, get_loading_style
 import utils.sim_executor as sim
 import utils.post_processing as post

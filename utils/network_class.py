@@ -29,130 +29,6 @@ class NetworkClass:
         self.input_file = input_file
     
     
-    def remove_ineffective_clusters(self, G):
-        """
-        """
-        # Get current positions of the nodes
-        Nodes, _ = self.get_nodes_and_bonds()
-        
-        # Get connected components of the graph
-        connected_components = list(nx.connected_components(G))
-        
-        # Removed the connected components that are coiled
-        ineffective_clusters_ids = []
-        for i, component in enumerate(connected_components):
-            subG = G.subgraph(component)
-            sub_edges = list(subG.edges)
-            subG_distances = []
-            
-            for bond in sub_edges:
-                n1, n2 = bond
-                dist = np.linalg.norm(Nodes[n1] - Nodes[n2])
-                subG_distances.append(dist)
-            
-            ## check if all distances are close to zero
-            is_coiled = np.all(np.array(subG_distances) < 1e-6)
-            if is_coiled:
-                ineffective_clusters_ids.append(i)
-        
-        # With ids of the ineffective clusters, remove them from the graph
-        for i in ineffective_clusters_ids:
-            G.remove_nodes_from(connected_components[i])
-        
-        return
-    
-    
-    def simplified_graph(self, Boundary):
-        """
-        Simplify the DN graph, removing nodes that do not contribute
-        for the "propagation" of information.
-        
-        Inputs:
-            Boundary (set): ids of boundary nodes
-            
-        Outputs:
-            simplified_G (networx graph): simplified graph
-            
-        """
-        # Create graph object
-        simplified_G = self.create_DN_graph()
-        
-        # Find out which nodes have degree zero or one
-        flag = True
-        while flag:
-            ## Find out which nodes have degree one or zero
-            nodes_of_interest = set()
-            for node in simplified_G.nodes():
-                if simplified_G.degree(node) == 0 or simplified_G.degree(node) == 1:
-                    nodes_of_interest.add(node)
-                    
-            ## Remove boundary nodes from the nodes of interest
-            selected_nodes = nodes_of_interest.difference(Boundary)
-            if not len(selected_nodes) > 0:
-                break
-                
-            ## Remove now node and edges associated with the selected nodes (if not empty)
-            for node in selected_nodes:
-                simplified_G.remove_node(node)
-            
-        
-        # Remove clusters that are coiled
-        self.remove_ineffective_clusters(simplified_G)
-        
-        
-        return simplified_G
-    
-    
-    def any_path(self, failure_criterion, initial_Nodes):
-        """
-        Find if there is a path spanning the network.
-        
-        Inputs:
-            failure_criterion (int): failure criterion.
-                    1: path spanning the loading direction (assumed direction 1).
-                
-                
-        Outputs
-            path_exists (bool): True if at least one path was found.
-            
-        """
-        
-        # Get ids of boundary nodes
-        Boundary = set(self.get_boundary())
-        
-        # Creat simplified graph object
-        G = self.simplified_graph(set(Boundary))
-        
-        # Remove nodes that are in the boundary but not in the graph anymore
-        G_nodes = set(G.nodes())
-        filtered_Boundary = Boundary.intersection(G_nodes)
-        path_exists = False ## asume path does not exists
-        
-        # Analyse if failure ocurred
-        if failure_criterion == 1:
-            ## Find to which nodes are on the xx plane
-            xx_0 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 0)] ## plane x = 0
-            xx_1 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 1)] ## plane x = 1
-            #Boundary_xx = xx_0, xx_1
-            
-            ## Get connected components of the current graph
-            components = list(nx.connected_components(G))
-            for component in components:
-                if any(n in component for n in xx_0) and any(n in component for n in xx_1):
-                    path_exists = True
-                    return path_exists
-            
-            
-            ## Query the existance of the path
-            # path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
-                                # for target in Boundary_xx[1])
-            #if not path_exists: breakpoint()
-        
-        
-        
-        return path_exists
-    
-    
     @staticmethod
     def get_bond_coeffs(data_file):
         """
@@ -479,401 +355,131 @@ class NetworkClass:
         return stress_kPa
 
 
-class FillerNetworkClass(NetworkClass):
+class FracNetworkClass(NetworkClass):
     """
-    A class for filled networks inherented from the NetworkClass
-    """
+    A class for networks where detersministic scissions are allowed.
+    Inherented from the NetworkClass.
     
-    def any_filler_missing(self, placed_fillers, initial_lengths, filler_offset):
+    """
+    def remove_ineffective_clusters(self, G):
         """
-        Check if there are fillers outside the computational domain.
-        NOTE: THIS MIGHT NEED SOME ADAPTATIONS TO IDENTIFY POSSIBLE M
-        MISSING CANDIDATES.
-        
-        Inputs:
-            placed_fillers (set): ids of nodes where spheres were placed.
-            initial_lengths (dict): initial length of the simulation box.
-            
-        Outputs:
-            is_missing_array (ndarray): boolean array informing whether a 
-                                        filler is out of the domain.
         """
-        # Query current box lengths
-        current_box = self.get_box_lengths()
-        stretches = [l / initial_lengths[key] for key, l in current_box.items()]
-        
-        # Caculate displacement deltas
-        delta_displacements = [(stretch - 1) for stretch in stretches]
-        box_bounds = [(0 - (du / 2), 1 + (du / 2)) for du in delta_displacements]
-        larger_box_bounds = [(-0.1 - (du / 2), 1.1 + (du / 2)) for du in delta_displacements]
-        
-        # Get DN graph and current position of the nodes
+        # Get current positions of the nodes
         Nodes, _ = self.get_nodes_and_bonds()
-        G = self.create_DN_graph()
-        adjency = G.adj
         
-        # Loop over the placed fillers set
-        is_missing_array = np.zeros(len(placed_fillers), dtype = bool)
-        for i, node_idx in enumerate(placed_fillers):
-            ## Initialize coordinates array
-            coordinates = []
-            coordinates.append(Nodes[node_idx])
+        # Get connected components of the graph
+        connected_components = list(nx.connected_components(G))
+        
+        # Removed the connected components that are coiled
+        ineffective_clusters_ids = []
+        for i, component in enumerate(connected_components):
+            subG = G.subgraph(component)
+            sub_edges = list(subG.edges)
+            subG_distances = []
             
-            ## Get filler points and calculate distances
-            for n in adjency[node_idx].keys():
-                coordinates.append(Nodes[n])
+            for bond in sub_edges:
+                n1, n2 = bond
+                dist = np.linalg.norm(Nodes[n1] - Nodes[n2])
+                subG_distances.append(dist)
             
-            ## Check if any 
-            coordinates = np.array(coordinates) ## transform into matrix
-            x, y, z = coordinates[:,0], coordinates[:,1], coordinates[:,2]
-            mask_x = (x < box_bounds[0][0]) | (x > box_bounds[0][1])
-            mask_y = (y < box_bounds[1][0]) | (y > box_bounds[1][1])
-            mask_z = (z < box_bounds[2][0]) | (y > box_bounds[2][1])
-            flag = np.any(mask_x | mask_y | mask_z)
+            ## check if all distances are close to zero
+            is_coiled = np.all(np.array(subG_distances) < 1e-6)
+            if is_coiled:
+                ineffective_clusters_ids.append(i)
+        
+        # With ids of the ineffective clusters, remove them from the graph
+        for i in ineffective_clusters_ids:
+            G.remove_nodes_from(connected_components[i])
+        
+        return
+    
+    
+    def simplified_graph(self, Boundary):
+        """
+        Simplify the DN graph, removing nodes that do not contribute
+        for the "propagation" of information.
+        
+        Inputs:
+            Boundary (set): ids of boundary nodes
             
-            ## Check if flag was triggered due to rounding errors
-            if flag:
-                    mask_x = (x < larger_box_bounds[0][0]) | (x > larger_box_bounds[0][1])
-                    mask_y = (y < larger_box_bounds[1][0]) | (y > larger_box_bounds[1][1])
-                    mask_z = (z < larger_box_bounds[2][0]) | (y > larger_box_bounds[2][1])
-                    larger_box_flag = np.any(mask_x | mask_y | mask_z)
+        Outputs:
+            simplified_G (networx graph): simplified graph
+            
+        """
+        # Create graph object
+        simplified_G = self.create_DN_graph()
+        
+        # Find out which nodes have degree zero or one
+        flag = True
+        while flag:
+            ## Find out which nodes have degree one or zero
+            nodes_of_interest = set()
+            for node in simplified_G.nodes():
+                if simplified_G.degree(node) == 0 or simplified_G.degree(node) == 1:
+                    nodes_of_interest.add(node)
                     
-                    if larger_box_flag:
-                        is_missing_array[i] = flag
-                    else:
-                        is_missing_array[i] = larger_box_flag
-            else:
-                is_missing_array[i] = flag
-            
-        
-        
-        return is_missing_array
-    
-    
-    def any_filler_overlap(self, placed_fillers, filler_radius, filler_offset):
-        """
-        Check if there is sphere overlap in the simulation
-        
-        Inputs:
-            placed_fillers (set): ids of nodes where spheres were placed.
-            filler_radius (float): radius of the filler
-            filler_offset (float): offset of the filler points.
-        Outputs:
-            
-        """
-        # Get the filler particles
-        coords_of_fillers = self.get_filler_coordinates(placed_fillers)
-        
-        # Loop over the scan
-        is_overlaped_array = np.zeros(len(placed_fillers), dtype = bool)
-        overlap_distance = 2 * (filler_radius + filler_offset) ## filler diameter with offset
-        for i, node_idx in enumerate(placed_fillers):
-            ## Filter ids not being looked
-            other_fillers_idx = placed_fillers.difference([node_idx])
-            
-            ## Get filler centre and the other ones as well
-            filler_centre = coords_of_fillers[node_idx]
-            existing_centres = np.array(
-                                    [coords_of_fillers[idx] for idx in other_fillers_idx]
-                                       )
-            tree = cKDTree(existing_centres)
-            
-            ## Query and store results
-            distance_query = tree.query_ball_point(filler_centre, overlap_distance)
-            is_overlaped_array[i] = len(distance_query) > 0
-            
-        
-        
-        return is_overlaped_array
-    
-    def get_filler_coordinates(self, placed_fillers):
-        """
-        Get the coordinates of filler particles.
-        
-        Inputs:
-            placed_fillers (set): ids of nodes where spheres were placed.
-            
-        Outputs:
-            coords_of_fillers (dict): idx and coordinates of filler particles
-                                      centres.
-        """
-        # Get current nodes and 
-        Nodes, Bonds = self.get_nodes_and_bonds()
-        
-        # Only look at 
-        coords_of_fillers = {idx: Nodes[idx] for idx in placed_fillers}
-        
-        return coords_of_fillers
-    
-    
-    def get_distances_filler(self):
-        """
-        Get distances in the network considering the presence 
-        of filler partiplces
-        
-        Inputs:
-            None
-        
-        Outputs:
-            distances (dict): distances of regular chains.
-        
-        """
-        
-        # Get Node coordinates and their positions
-        Nodes, Bonds = self.get_nodes_and_bonds()
-        
-        # Get which bonds are regular
-        idx_of_regular_bonds = self.get_regular_bonds()
-        filtered_Bonds = {idx: bond for idx, bond in Bonds.items() if idx in idx_of_regular_bonds}
-        
-        # Scan and store results
-        distances = {}
-        for idx, bond in filtered_Bonds.items():
-            n1, n2 = bond
-            vector = Nodes[n1] - Nodes[n2]
-            distances[idx] = np.linalg.norm(vector)
-        
-        return distances
-    
-    
-    def get_regular_bonds(self):
-        """
-        Get bonds number of regular chains, i.e, not forming filler particles.
-        
-        Inputs:
-            None
-            
-        Outputs:
-            idx_of_regular_bonds (tuple): sequence of indices of regular chains.
-        """
-        
-        # Read file and find the regular bonds
-        idx_of_regular_bonds = []
-        with open(self.data_file, "r") as f:
-            ## Read until spring coefficients are found
-            key = f.readline()
-            while "Bond Coeffs" not in key:
-                key = f.readline()
-            
-            f.readline() ## empty line
-            
-            ## Check if hybrid bond style is being used
-            data = f.readline().strip("\n").split(" ")
-            try:
-                float(data[1])
-                hybrid_style_flag = False
-            except ValueError:
-                hybrid_style_flag = True
-            
-            ## Find the bonds defining the sphere
-            while len(data) > 1:
+            ## Remove boundary nodes from the nodes of interest
+            selected_nodes = nodes_of_interest.difference(Boundary)
+            if not len(selected_nodes) > 0:
+                break
                 
-                if hybrid_style_flag:
-                    if not 'harmonic' in data:
-                        idx_of_regular_bonds.append(int(data[0]))
-                else:
-                    if np.isclose(float(data[-1]), 0):
-                        idx_of_regular_bonds.append(int(data[0]))
-                    
-                data = f.readline().strip("\n").split(" ")
+            ## Remove now node and edges associated with the selected nodes (if not empty)
+            for node in selected_nodes:
+                simplified_G.remove_node(node)
             
         
-        return idx_of_regular_bonds
+        # Remove clusters that are coiled
+        self.remove_ineffective_clusters(simplified_G)
+        
+        
+        return simplified_G
     
     
-    
-    def get_volume_fraction(nFillers, filler_radius):
+    def any_path(self, failure_criterion, initial_Nodes):
         """
-        Calculate the volume fraction in the network for a given number of 
-        particles and dimensionless filler radius.
+        Find if there is a path spanning the network.
         
         Inputs:
-            nFillers(int): number of filler networks in the network
-            filler_radius (float):
-        Outputs:
+            failure_criterion (int): failure criterion.
+                    1: path spanning the loading direction (assumed direction 1).
+                
+                
+        Outputs
+            path_exists (bool): True if at least one path was found.
             
-        
         """
-        # Calculate the volume fraction
-        vol_fraction = 4 * np.pi * np.power(filler_radius, 3) / 3.
-        return vol_fraction
-    
-    
-    
-    def get_filler_angles_deviations(self, angle_to_pair):
-        """
-        Get deviation of the filler angles after equilibrium for a 
-        given deformation.
         
-        Inputs:
-            angle_to_pair(dict): angle-to-bond pair map.
+        # Get ids of boundary nodes
+        Boundary = set(self.get_boundary())
+        
+        # Creat simplified graph object
+        G = self.simplified_graph(set(Boundary))
+        
+        # Remove nodes that are in the boundary but not in the graph anymore
+        G_nodes = set(G.nodes())
+        filtered_Boundary = Boundary.intersection(G_nodes)
+        path_exists = False ## asume path does not exists
+        
+        # Analyse if failure ocurred
+        if failure_criterion == 1:
+            ## Find to which nodes are on the xx plane
+            xx_0 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 0)] ## plane x = 0
+            xx_1 = [node for node in filtered_Boundary if np.isclose(initial_Nodes[node][0], 1)] ## plane x = 1
+            #Boundary_xx = xx_0, xx_1
             
-        Outputs:
-            deviations (dict): average and std current-to-initial angle ratio
-        
-        """
-        # Query DN
-        Nodes, Bonds = self.get_nodes_and_bonds()
-        Angles = self.get_angles_and_triplets()
-        
-        # Loop over the angle-to-pair map
-        temp = defaultdict(list)
-        for angle_idx, bonds_idx in angle_to_pair.items():
-            ## Get the vectors
-            b1, b2 = Bonds[bonds_idx[0]], Bonds[bonds_idx[1]]
-            v1 = Nodes[b1[0]] - Nodes[b1[1]]
-            v2 = Nodes[b2[0]] - Nodes[b1[1]]
+            ## Get connected components of the current graph
+            components = list(nx.connected_components(G))
+            for component in components:
+                if any(n in component for n in xx_0) and any(n in component for n in xx_1):
+                    path_exists = True
+                    return path_exists
             
-            ## Calculate current angle between pairs
-            dot_product = np.dot(v1 / np.linalg.norm(v1), v2 / np.linalg.norm(v2))
-            theta = np.degrees(np.arccos(np.clip(dot_product, -1, 1)))
             
-            ## Store in appropriate position the information
-            b1, b2 = set(b1), set(b2)
-            node = next(iter((b1.intersection(b2))))
-            theta0 = Angles[angle_idx][1]
-            temp[node].append(np.abs(theta - theta0))
-            
-        
-        # Use the average the results in the dict
-        deviations = {key: (np.mean(data), np.std(data)) for key, data in temp.items()}
-        
-        # Return also maxmum and minimum deviation
-        max_key = max(deviations, key=lambda k: deviations[k][0])
-        min_key = min(deviations, key=lambda k: deviations[k][0])
-        max_avg_deviation = deviations[max_key][0]
-        min_avg_deviation = deviations[min_key][0]
-        
-        return deviations, max_avg_deviation, min_avg_deviation
-    
-    def get_filler_radii_deviations(self, bond_flags, selected_nodes, filler_radius):
-        """
-        Get the deviation in filler radii after equilibrium for a given
-        deformation.
-        
-        Inputs:
-            bond_flags (dict): flags that inform if bond forms a filler.
-            selected_nodes (list): indiced of the nodes acting as the filler centres.
-            filler_radius (flaot): expected radius of the filler.
-            
-        Outputs:
-            deviations (list): list of current-to-initial radii ratios.
-        """
-        # Query DN
-        Nodes, Bonds = self.get_nodes_and_bonds()
-        
-        # Map filler bonds to their centres
-        bond_to_centre_map = defaultdict(list)
-        for idx, bond in Bonds.items():
-            if all(bond_flags[idx]):
-                for node in bond:
-                    if node in selected_nodes:
-                        bond_to_centre_map[node].append(bond)
-            
+            ## Query the existance of the path
+            # path_exists = any(nx.has_path(G, source, target) for source in Boundary_xx[0] 
+                                # for target in Boundary_xx[1])
+            #if not path_exists: breakpoint()
         
         
-        # Calculate deviations
-        deviations = [
-            np.mean([np.linalg.norm(Nodes[n1] - Nodes[n2]) for (n1, n2) in bond_to_centre_map[node]]) / filler_radius
-            for node in selected_nodes
-        ]
-    
-        return deviations
-    
-    
-    
-    def get_angles_and_triplets(self):
-        """
-        Get initial angles and the triplets defining each one of them
-        Inputs:
-            None
         
-        Outputs:
-            Angles (dict): triplet of nodes forming the angle and their 
-                           initial values. The function will return None
-                           if there are not angle restrictions.
-        """
-        # Check if method is aplicable 
-        with open(self.data_file, "r") as f:
-            lines = f.readlines()
-        NA_flags = ["Angles" in line or "Angle Coeffs" in line for line in lines]
-        if not any(NA_flags):
-            return None
-        
-        # Scan file
-        with open(self.data_file, "r") as f:
-            ## Go through file until angle coefficientes were found
-            key = f.readline()
-            while "Angle Coeffs" not in key:
-                key = f.readline()
-            
-            f.readline() ##read empty line
-            
-            ## Read the theta0 values of each angle
-            theta0 = {}
-            data = f.readline().strip("\n").split(" ")
-            while len(data) > 1:
-                theta0[int(data[0])] = float(data[2])
-                data = f.readline().strip("\n").split(" ")
-            
-            ## Now scan until the angles section is reached
-            key = f.readline()
-            while "Angle" not in key:
-                key = f.readline()
-            
-            f.readline() ## empty line 
-            
-            ## Read list of triplets and to which angle they are linked
-            data = f.readline().strip("\n").split(" ")
-            triplets = {}
-            while len(data) > 1:
-                idx = int(data[1])
-                triplet = int(data[2]), int(data[3]), int(data[4])
-                triplets[idx] = triplet
-                data = f.readline().strip("\n").split(" ")
-            
-        
-        # Assamble list of angles
-        Angles = {}
-        for idx in theta0.keys():
-            Angles[idx] = triplets[idx], theta0[idx]
-        
-        return Angles
-        
-    
-    @staticmethod
-    def estimate_nFillers(vol_fraction, filler_radius):
-        """
-        Estimate the number of fillers particles needed in the network
-        for a given volume fraction of fillers and normalize filler 
-        radius.
-        """
-        nFillers = np.ceil(3 * vol_fraction / (4 * np.pi * np.power(filler_radius, 3)))
-        return int(nFillers)
-    
-    @staticmethod
-    def estimate_filler_radius(vol_fraction, nFillers):
-        """
-        Estimate normalised filler radius for a given filler volume
-        fraction and number of filler particles in the network
-        """
-        filler_radius = np.power(3 * vol_fraction / (4 * np.pi * nFillers), 1 / 3)
-        return filler_radius
-    
-    @staticmethod
-    def get_filler_par(csv_file):
-        """
-        Read csv file containing filler parameters
-        
-        Inputs:
-            csv_file (str): full path to acces the file.
-            
-        Outputs:
-            nFillers (int): number of filler particles
-            filler_radius (float): radius of the fillers.
-            filler_offset (float): filler points offset.
-        """
-        # Open the data file
-        data = np.loadtxt(csv_file, delimiter = ",")
-        
-        return nFillers, filler_radius, filler_offset
+        return path_exists
