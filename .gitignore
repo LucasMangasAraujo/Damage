@@ -11,3 +11,12 @@ Monotonic/*.lammps
 # Folder containing geometries
 Monotonic/rep_DNs/
 Monotonic/results/
+
+# Irrelevant folders and files in Monotonic_poly
+Monotonic_poly/*.dat
+Monotonic_poly/*.in
+Monotonic_poly/*.res
+Monotonic_poly/log
+Monotonic_poly/*.lammps
+Monotonic_poly/rep_DNs/
+Monotonic_poly/results/
