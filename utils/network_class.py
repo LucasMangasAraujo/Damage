@@ -361,8 +361,33 @@ class FracNetworkClass(NetworkClass):
     Inherented from the NetworkClass.
     
     """
+    
+    @staticmethod
+    def integrate_stress_strain(nominal_stress, stretch):
+        """
+        Integrate the nominal stress-strain curve.
+        
+        Inputs:
+            nominal_stress (ndarray): self-explanatory
+            stretch (ndarray): self-explanatory
+            
+        Outputs:
+            W (float): Energy density.
+        """
+        # Integrate
+        W = np.trapz(nominal_stress, stretch)
+        
+        return W
+    
     def remove_ineffective_clusters(self, G):
         """
+        Remover clusters that are coiled from the Graph.
+        
+        Inputs:
+            G (networkx graph obj): self-explanatory
+            
+        Outputs: 
+            None
         """
         # Get current positions of the nodes
         Nodes, _ = self.get_nodes_and_bonds()

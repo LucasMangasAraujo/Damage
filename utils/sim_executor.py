@@ -497,6 +497,7 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     
     Outputs:
         out (tuple): results of the simulation
+        Wf (float): work of fracture
     """
     
     # Unpack parameters tuple, which mighht vary depending of the chain model
@@ -633,8 +634,8 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     # Convert stress array to ndarray
     cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
     nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
-    
     out = np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), np.array(fraction_broken_chains)
+    
     
     return out
 

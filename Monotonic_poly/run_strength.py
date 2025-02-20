@@ -34,9 +34,10 @@ def main():
     loading = 1
     stretch_increment = 0.1
     
-    # Define strengths to be testes
+    # Define strengths to be tested
     strengths = 0.4, 0.8
     strong_fractions = 0.0, 0.2, 0.4, 0.6, 0.8, 1.0
+    Wf_array = [] ## array to store 
     
     for phi in strong_fractions:
         ## print information on the screen
@@ -52,7 +53,7 @@ def main():
         ## Assemble folders 
         rep_folder_names = "rep_DNs", "strength_effect", str(phi) + "_strong"
         results_folder_names = "results", "strength_effect", str(phi) + "_strong"
-        results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3]"
+        results_file = "data.csv"
         
         ## Run simulations for the specified number of repeats
         results_dict = {}
@@ -65,6 +66,7 @@ def main():
                 ## store simulation results in dict
                 results_dict[i + 1] = out
             
+            results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3]"
         else:
             ## Run representative simulation
             out = sim.runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_increment,
@@ -72,15 +74,30 @@ def main():
                                                 strengths, phi)
             results_dict[1] = out
             
-            ## Declare destination folde of the results 
-            results_file = "data.csv"
+            results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3]"
             
         
         # After completion average results
-        averaged_results = post.average_fracture_results(results_dict, loading)
+        averaged_results, Wf = post.average_fracture_results(results_dict, loading)
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
+        
+        # Average the work of fracture results
+        if isinstance(Wf, float):
+            Wf_array.append(Wf)
+        else:
+            breakpoint()
+        
         print(100 * "*")
         print("\n")
+        
+    
+    # Save results for the work of fracture
+    results_folder_names = "results", "strength_effect"
+    results_file = "Wf.csv"
+    if isinstance(Wf, float):
+        results_comments = "phi[0] Wf[1]"
+    averaged_results = strong_fractions, Wf_array
+    post.write_results(results_folder_names, results_file, results_comments, averaged_results)
     
     return
 

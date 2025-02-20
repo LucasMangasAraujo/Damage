@@ -6,6 +6,7 @@ import numpy as np
 from scipy.spatial import KDTree
 from pathlib import Path
 from collections import defaultdict
+from .network_class import FracNetworkClass
 
 def average_fracture_results(results_dict, loading):
     """
@@ -46,9 +47,13 @@ def average_fracture_results(results_dict, loading):
         ## Assemble output
         averaged_results = stretch_array, cauchy_stress, nominal_stress, fraction_broken_chains
         
+        ## Integrate the nominal stress-strain curve
+        Wf = FracNetworkClass.integrate_stress_strain(nominal_stress, stretch_array)
+        
     
     
-    return averaged_results
+    return averaged_results, Wf
+
 
 
 def full_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
