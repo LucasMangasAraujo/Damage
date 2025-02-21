@@ -344,8 +344,6 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
         stretch_increment (float):
         failure_criterion (int): 
         folder_names (tuple): string to form path where geometries will be placed
-        multi_strength (bool): true if bimodal chain strengths are used. False by default.
-        strengths (tuple)
     
     Outputs:
         out (tuple): results of the simulation
@@ -367,15 +365,15 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     i = 0 ## increment counter
     
     # Relax as generated network
-    print("Starting simulation for network in file %s, with no fillers..." %geometry_file)
+    print("Starting simulation for network in file %s" %geometry_file)
     print(100 * "=")
     relax_as_generated_DN(geometry_file, model, params, dim, data_file)
     
     # Create initial DN object
-    DN_initial = NetworkClass(data_file, "test.res", "main.in") ## reference configuration
+    DN_initial = FracNetworkClass(data_file, "test.res", "main.in") ## reference configuration
     computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
     cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
-    nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+    nominal_stress = FracNetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
     
     # Get initial number of nodes and initial coordinates
     initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
@@ -432,15 +430,14 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
         scission_detected = nBonds < initial_nBonds
         if scission_detected:
             print("Scissions detected, perfoming relaxation until no more scisison are detected")
-            print("Stretch increment reduced from %g to %g" %(current_inc, current_inc * inc_reduction_factor))
-            current_inc *= inc_reduction_factor
+            
             while scission_detected:
                 ## relax network
                 err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
                 if not err:
                     print("relaxation completed")
                 ## update DN object
-                DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+                DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
                 temp = len(DN.get_nodes_and_bonds()[1])
                 scission_detected = temp < nBonds
                 print("nChains pre-relaxation: %d" %nBonds)
@@ -451,7 +448,7 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
                     
         ## Calculate stresses
         cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
-        nominal_stress = NetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
+        nominal_stress = FracNetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
         
         ## Append current stress to the stress array
         cauchy_stress_array.append(cauchy_stress)
@@ -486,8 +483,8 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     print("Finished simulation for network in file %s!" %geometry_file)
     
     # Convert stress array to ndarray
-    cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
-    nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
+    cauchy_stress_array = FracNetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
+    nominal_stress_array = FracNetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     
     out = np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), np.array(fraction_broken_chains)
     

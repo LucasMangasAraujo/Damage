@@ -12,6 +12,7 @@ Monotonic/*.lammps
 # Folder containing geometries
 Monotonic/rep_DNs/
 Monotonic/results/
+Monotonic/run_density_and_preStretch.py
 
 # Irrelevant folders and files in Monotonic_poly
 Monotonic_poly/*.dat
