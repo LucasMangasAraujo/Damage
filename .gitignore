@@ -1,5 +1,6 @@
 # pycache
-utils/__pycache__/
+utils/__pycache__/*.pyc
+utils/__pycache__/*.pyo
 
 # Irrelevant files in Monotonic Folder
 Monotonic/*.dat
@@ -20,4 +21,4 @@ Monotonic_poly/*.res
 Monotonic_poly/log
 Monotonic_poly/*.lammps
 Monotonic_poly/rep_DNs/
-Monotonic_poly/results/*.pyc
+Monotonic_poly/results/
