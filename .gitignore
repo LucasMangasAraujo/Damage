@@ -9,7 +9,6 @@ Monotonic/*.res
 Monotonic/log
 Monotonic/*.lammps
 
-
 # Folder containing geometries
 Monotonic/rep_DNs/
 Monotonic/results/
@@ -21,8 +20,4 @@ Monotonic_poly/*.res
 Monotonic_poly/log
 Monotonic_poly/*.lammps
 Monotonic_poly/rep_DNs/
-<<<<<<< HEAD
 Monotonic_poly/results/
-=======
-Monotonic_poly/results/
->>>>>>> feature
