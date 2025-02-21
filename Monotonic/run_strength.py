@@ -31,9 +31,12 @@ def main():
     
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     # Declare some parameters for elastic simulations
     elastic_params = bKuhn, NKuhn, nub3
     elastic_model = '2'
+=======
+>>>>>>> feature
 =======
 >>>>>>> feature
 =======
@@ -49,7 +52,10 @@ def main():
     for critical_r_Nb in strengths:
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> feature
 =======
 >>>>>>> feature
         ## print information on the screen
@@ -60,6 +66,9 @@ def main():
         print("Failure type: %d" %failure_criterion)
         
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> feature
+=======
 >>>>>>> feature
 =======
 >>>>>>> feature
@@ -97,7 +106,12 @@ def main():
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         
+=======
+        print(100 * "*")
+        print("\n")
+>>>>>>> feature
 =======
         print(100 * "*")
         print("\n")
