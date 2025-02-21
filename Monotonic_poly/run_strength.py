@@ -37,6 +37,7 @@ def main():
     # Define strengths to be tested
     strengths = 0.4, 0.8
     strong_fractions = 0.0, 0.2, 0.4, 0.6, 0.8, 1.0
+    strong_fractions = np.arange(0.0, 1.1, 0.1)
     Wf_array = [] ## array to store 
     
     for phi in strong_fractions:
