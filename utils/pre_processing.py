@@ -401,10 +401,11 @@ def writePositions(filename, Nodes, Bonds, Boundary, BondTypes, model, params, r
                 
             elif model == '4':
                 ## Check if N is not an array
-                if isinstance(N, float):
+                try:
+                    float(N)
                     critical_r_Nb = params[-1]
                     f.write("1 %g %g %g" %(bKuhn, N, critical_r_Nb))
-                else:
+                except TypeError:
                     NKuhn, critical_r_Nb = N
                     f.write("1 %g %g %g" %(bKuhn, NKuhn, critical_r_Nb))
             

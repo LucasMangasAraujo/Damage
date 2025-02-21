@@ -50,9 +50,13 @@ def average_fracture_results(results_dict, loading):
         ## Integrate the nominal stress-strain curve
         Wf = FracNetworkClass.integrate_stress_strain(nominal_stress, stretch_array)
         
+        
+        ## Get average pre-stretch
+        preStretch_distr = results_dict[1][4]
+        preStretch = np.sqrt(np.mean(preStretch_distr**2))
     
     
-    return averaged_results, Wf
+    return averaged_results, Wf, preStretch
 
 
 
@@ -95,7 +99,7 @@ def average_elastic_results(results_dict, loading):
         
     
     
-    return averaged_results, Wf
+    return averaged_results
 
 
 def full_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):

@@ -375,6 +375,9 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
     nominal_stress = FracNetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
     
+    # Get pre-stretch of the network
+    preStretch_distr = DN_initial.get_preStretch_distr(model)
+    
     # Get initial number of nodes and initial coordinates
     initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
     initial_nBonds = len(initial_Bonds) 
@@ -410,20 +413,29 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
         print(100 * "=")
         ## Run deformatio step
         i += 1
-        err = runinc(loading, i + 1, current_inc, dim, main_file = 'main.in')
+        err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main.in')
         
         ## Check if simulation was aborted
         if err:
             print("Increment failed")
             i -= 1
-            break
-        else:
-            ## Calculate current deformatio gradient
-            F = deformation_gradient(loading, stretch_array[i - 1] + current_inc)
-            stretch_array.append(F[0])
+            ## Run reduced increments
+            err = run_reduced_inc(data_file, stretch_increment, loading, dim, main_file = 'main.in')
             
-            ## Initialise DN object
-            DN = NetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            if err:
+                print("Reduced increments did not work..")
+                break
+            else:
+                print("Reduced increments worked!")
+                i +=1
+            
+        
+        ## Calculate current deformatio gradient
+        F = deformation_gradient(loading, stretch_array[i - 1] + stretch_increment)
+        stretch_array.append(F[0])
+        
+        ## Initialise DN object
+        DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
         
         ## Check if scissions ocurred, and if yes, relax the network
         nBonds = len(DN.get_nodes_and_bonds()[1])
@@ -436,6 +448,8 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
                 err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
                 if not err:
                     print("relaxation completed")
+                else:
+                    breakpoint()
                 ## update DN object
                 DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
                 temp = len(DN.get_nodes_and_bonds()[1])
@@ -486,11 +500,83 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     cauchy_stress_array = FracNetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
     nominal_stress_array = FracNetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     
-    out = np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), np.array(fraction_broken_chains)
+    out = (np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), 
+                np.array(fraction_broken_chains), preStretch_distr
+           )
     
     return out
 
 
+def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_attempts = 4):
+    """
+    Run increments of reduced size.
+    
+    Inputs:
+    
+    Outputs:
+    
+    """
+    # Initialise variables
+    current_inc = 0
+    attempt = 0
+    reduced_inc = stretch_increment * 0.5
+    
+    # Get number of bonds in the beginning of the time step
+    DN = FracNetworkClass(data_file, "test.res", main_file)
+    nBonds_beginning = len(DN.get_nodes_and_bonds()[1])
+    
+    # Run 
+    print("Reducing in half the increment size...")
+    print("Maximum number of attempts: %d" %max_attempts)
+    while current_inc < stretch_increment:
+        err = runinc(loading, 0, reduced_inc, dim, main_file)
+        if err:
+            ## Reduce by half, and try again
+            reduced_inc *= 0.5
+            attempt += 1
+            if attempt > max_attempts:
+                print("Maximum number of attempts reached!")
+                err = True
+            print("Reduced increment did not work. Reducing more and trying again...")
+            print("Reduced attempt: %d" %attempt)
+        else:
+            ## Check if scissions ocurred during the reduced increment
+            relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning)
+            current_inc += reduced_inc
+    
+    return err
+
+def relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning):
+    
+    
+    # Create current DN object
+    DN = FracNetworkClass(data_file, "test.res", main_file) ## Netwotk object
+    
+    ## Check if scissions ocurred, and if yes, relax the network
+    nBonds = len(DN.get_nodes_and_bonds()[1])
+    scission_detected = nBonds < nBonds_beginning
+    
+    if scission_detected:
+        print("Scissions detected, perfoming relaxation until no more scisison are detected")
+        
+        while scission_detected:
+            ## relax network
+            err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = main_file);
+            if not err:
+                print("relaxation completed")
+            else:
+                break
+            ## update DN object
+            DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            temp = len(DN.get_nodes_and_bonds()[1])
+            scission_detected = temp < nBonds
+            print("nChains pre-relaxation: %d" %nBonds)
+            print("nChains after-relaxation: %d" %temp)
+            nBonds = temp
+            if scission_detected:
+                print("Doing another relaxation, as scissions were still detected")
+    
+    return
 
 
 

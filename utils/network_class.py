@@ -28,6 +28,64 @@ class NetworkClass:
         self.dump_file = dump_file
         self.input_file = input_file
     
+    def get_preStretch_distr(self, model):
+        """
+        Get the pre-stretch distribution.
+        """
+        # Read data file
+        with open(self.data_file,"r") as f:
+            ## Get the Bond types and their coefficients
+            key = f.readline()
+            while "Bond Coeffs" not in key:
+                key = f.readline()
+            
+            BondCoeffs = {}
+            f.readline()
+            data = f.readline().strip("\n").split(" ")
+            while len(data) > 1:
+                if model == '4':
+                    BondCoeffs[int(data[0])] = float(data[1]), float(data[2]), float(data[3])
+                
+                data = f.readline().strip("\n").split(" ")
+            
+            ## Read node positions
+            f.readline() ## read atoms header
+            f.readline() ## read skip line
+            data = f.readline().strip("\n").split(" ")
+            Nodes = {}
+            while len(data) > 1:
+                Nodes[int(data[0])] = np.array([float(data[3]), float(data[4]), float(data[5])])
+                data = f.readline().strip("\n").split(" ")
+            
+            ## Keep readin until bond section is reached
+            key = f.readline()
+            while "Bonds" not in key:
+                key = f.readline()
+            f.readline()
+            
+            ## Read bonds
+            Bonds = {}
+            data = f.readline().strip("\n").split(" ")
+            while len(data) > 1:
+                Bonds[int(data[0])] = int(data[1]), int(data[2]), int(data[3])
+                data = f.readline().strip("\n").split(" ")
+            
+        
+        
+        # Loop over the Bonds dict
+        preStretch_distr = []
+        for idx, (bond_type, n1, n2) in Bonds.items():
+            v = Nodes[n1] - Nodes[n2]
+            r0 = np.linalg.norm(v)
+            if model == '4':
+                b, N = BondCoeffs[bond_type][0], BondCoeffs[bond_type][1]
+            
+            lambda0 = r0 / (np.sqrt(N)* b)
+            preStretch_distr.append(lambda0)
+        
+        
+        return np.array(preStretch_distr)
+    
     
     @staticmethod
     def get_bond_coeffs(data_file):
