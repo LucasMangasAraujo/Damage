@@ -32,9 +32,12 @@ def main():
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     # Declare some parameters for elastic simulations
     elastic_params = bKuhn, NKuhn, nub3
     elastic_model = '2'
+=======
+>>>>>>> feature
 =======
 >>>>>>> feature
 =======
@@ -53,7 +56,10 @@ def main():
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> feature
 =======
 >>>>>>> feature
 =======
@@ -67,6 +73,9 @@ def main():
         
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
+>>>>>>> feature
+=======
 >>>>>>> feature
 =======
 >>>>>>> feature
@@ -107,7 +116,12 @@ def main():
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         
+=======
+        print(100 * "*")
+        print("\n")
+>>>>>>> feature
 =======
         print(100 * "*")
         print("\n")
