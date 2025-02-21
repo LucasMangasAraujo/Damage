@@ -52,8 +52,8 @@ def main():
         params = (bKuhn, NKuhn, nub3)
         
         ## Assemble folders 
-        rep_folder_names = "rep_DNs", "strength_effect", str(phi) + "_strong"
-        results_folder_names = "results", "strength_effect", str(phi) + "_strong"
+        rep_folder_names = "rep_DNs", "strength_effect", str(round(phi, 1)) + "_strong"
+        results_folder_names = "results", "strength_effect", str(round(phi, 1)) + "_strong"
         results_file = "data.csv"
         
         ## Run simulations for the specified number of repeats

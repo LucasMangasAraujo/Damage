@@ -21,3 +21,6 @@ Monotonic_poly/log
 Monotonic_poly/*.lammps
 Monotonic_poly/rep_DNs/
 Monotonic_poly/results/
+
+# Geometries
+Geometries/nu*
