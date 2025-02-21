@@ -30,9 +30,12 @@ def main():
     dim = 3 ## problem dimension
     
 <<<<<<< HEAD
+<<<<<<< HEAD
     # Declare some parameters for elastic simulations
     elastic_params = bKuhn, NKuhn, nub3
     elastic_model = '2'
+=======
+>>>>>>> feature
 =======
 >>>>>>> feature
     
@@ -45,7 +48,10 @@ def main():
     
     for critical_r_Nb in strengths:
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> feature
         ## print information on the screen
         print(100 * "*")
         print("Running simulations where the chains fail at r /(Nb) = %g" %critical_r_Nb)
@@ -53,6 +59,9 @@ def main():
         print("bKuhn = %g nm, NKuhn = %g, nub3 = %g" %(bKuhn, NKuhn, nub3))
         print("Failure type: %d" %failure_criterion)
         
+<<<<<<< HEAD
+>>>>>>> feature
+=======
 >>>>>>> feature
         ## Assemble parameters
         params = (bKuhn, NKuhn, nub3, critical_r_Nb)
@@ -87,7 +96,12 @@ def main():
         averaged_results = post.average_fracture_results(results_dict, loading)
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
 <<<<<<< HEAD
+<<<<<<< HEAD
         
+=======
+        print(100 * "*")
+        print("\n")
+>>>>>>> feature
 =======
         print(100 * "*")
         print("\n")

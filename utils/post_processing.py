@@ -95,7 +95,8 @@ def average_elastic_results(results_dict, loading):
         
     
     
-    return averaged_results
+    return averaged_results, Wf
+
 
 
 
