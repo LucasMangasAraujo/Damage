@@ -56,6 +56,48 @@ def average_fracture_results(results_dict, loading):
 
 
 
+def average_elastic_results(results_dict, loading):
+    """
+    Average the results coming from elastic simulations. 
+    Note this function is also valid for simulations
+    with one repeat.
+    
+    Each value of the dict is formed by a tuple containing ndarrays
+    containing information in the following order.
+        stretch: value of applied stretch.
+        cauchy stress: rubbery components of stress.
+        nominal stress: nominal components of stress
+    
+    Inputs:
+        results_dict (dict): results of the simulation of each repeat.
+        loading (int): Type of loading used.
+    """
+    
+    # Check if representative simulation was perfomed
+    not_one_repeat = len(results_dict.keys()) > 1
+    
+    # Perform analysis depending on the type of simulation that was done.
+    if not_one_repeat:
+        ## under dev
+        breakpoint()
+    else:
+        ## No need for averaging.
+        stretch_array = results_dict[1][0]
+        cauchy_rubbery = results_dict[1][1]
+        nominal_rubbery = results_dict[1][2]
+        
+        ## Calculate full stress depending on the loading conditions.
+        cauchy_stress, nominal_stress = full_stress(stretch_array, cauchy_rubbery, 
+                                                        nominal_rubbery, loading)
+        
+        ## Assemble output
+        averaged_results = stretch_array, cauchy_stress, nominal_stress
+        
+    
+    
+    return averaged_results, Wf
+
+
 def full_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
     """
     Obtain the non-zero stress component based on the BCx.
