@@ -54,7 +54,6 @@ def average_fracture_results(results_dict, loading):
     
     return averaged_results, Wf
 
-<<<<<<< HEAD
 
 
 def average_elastic_results(results_dict, loading):
@@ -97,10 +96,6 @@ def average_elastic_results(results_dict, loading):
     
     
     return averaged_results, Wf
-
-
-=======
->>>>>>> feature
 
 
 def full_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
