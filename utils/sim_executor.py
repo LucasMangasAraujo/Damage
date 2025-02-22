@@ -442,7 +442,7 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
         nBonds = len(DN.get_nodes_and_bonds()[1])
         scission_detected = nBonds < nBonds_beginning
         if scission_detected:
-            relax_unitl_no_scissions(data_file, dim, "main.in", nBonds_beginning)
+            nBonds = relax_unitl_no_scissions(data_file, dim, "main.in", nBonds_beginning)
             nBonds_beginning = nBonds
             
         ## Update DN object
@@ -551,14 +551,19 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
     nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
     
+    # Get pre-stretch of the network
+    preStretch_distr = DN_initial.get_preStretch_distr(model)
+    
     # Get initial number of nodes and initial coordinates
     initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
-    initial_nBonds = len(initial_Bonds) 
+    initial_nBonds = len(initial_Bonds)
+    nBonds_beginning = initial_nBonds
     
     # Append initial information
     stretch_array.append(1.)
     cauchy_stress_array.append(cauchy_stress)
     nominal_stress_array.append(nominal_stress)
+    
     
     # Query for initial failure
     path_exists = DN_initial.any_path(failure_criterion, initial_Nodes)
@@ -590,35 +595,34 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
         if err:
             print("Increment failed")
             i -= 1
-            break
-        else:
-            ## Calculate current deformatio gradient
-            F = deformation_gradient(loading, stretch_array[i - 1] + stretch_increment)
-            stretch_array.append(F[0])
+            ## Run reduced increments
+            err = run_reduced_inc(data_file, stretch_increment, loading, dim, main_file = 'main.in')
             
-            ## Initialise DN object
-            DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            if err:
+                print("Reduced increments did not work..")
+                break
+            else:
+                print("Reduced increments worked!")
+                i += 1 ## update increment number
+            
+        
+        ## Calculate current deformatio gradient
+        F = deformation_gradient(loading, stretch_array[i - 1] + stretch_increment)
+        stretch_array.append(F[0])
+        
+        ## Initialise DN object
+        DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
         
         ## Check if scissions ocurred, and if yes, relax the network
         nBonds = len(DN.get_nodes_and_bonds()[1])
-        scission_detected = nBonds < initial_nBonds
+        scission_detected = nBonds < nBonds_beginning
         if scission_detected:
-            print("Scissions detected, perfoming relaxation until no more scisison are detected")
-            while scission_detected:
-                ## relax network
-                err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
-                if not err:
-                    print("relaxation completed")
-                ## update DN object
-                DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
-                temp = len(DN.get_nodes_and_bonds()[1])
-                scission_detected = temp < nBonds
-                print("nChains pre-relaxation: %d" %nBonds)
-                print("nChains after-relaxation: %d" %temp)
-                nBonds = temp
-                if scission_detected:
-                    print("Doing another relaxation, as scissions were still detected")
-                    
+            nBonds = relax_unitl_no_scissions(data_file, dim, "main.in", nBonds_beginning)
+            nBonds_beginning = nBonds
+        
+        ## Update DN object
+        DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object 
+        
         ## Calculate stresses
         cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
         nominal_stress = NetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
@@ -658,9 +662,10 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     # Convert stress array to ndarray
     cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
     nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
-    out = np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), np.array(fraction_broken_chains)
-    
-    
+    out = (np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), 
+                np.array(fraction_broken_chains), preStretch_distr
+           )
+        
     return out
 
 def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_attempts = 4):
@@ -704,15 +709,26 @@ def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_a
         else:
             ## Check if scissions ocurred during the reduced increment
             print("Reduced increment worked!")
-            relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning)
+            out = relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning)
             current_inc += reduced_inc
     
     return err
 
 
-
 def relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning):
+    """
+    Relax the network after defomation until scissions are not detected
+    anymore.
     
+    Inputs:
+        data_file (str): name of LAMMPS data file
+        dim (int): dimension of the probem (2 or 3)
+        main_file (str): name of LAMMPS input file.
+        nBonds_beginning (int): number of bonds after deformation.
+        
+    Outputs:
+        None
+    """
     
     # Create current DN object
     DN = FracNetworkClass(data_file, "test.res", main_file) ## Netwotk object
@@ -751,13 +767,19 @@ def relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning):
             if scission_detected:
                 print("Doing another relaxation, as scissions were still detected")
     
-    return
+    return nBonds
 
 
 
 def reduce_LAMMPS_timestep(main_file):
     """
-    Reduce the time step of LAMMPS integrator
+    Reduce the time step of LAMMPS integrator.
+    
+    Inputs:
+        main_file (str): name of the original LAMMPS input file.
+        
+    Outputs:
+        None
     """
     
     # Name of temporary main_file
