@@ -380,7 +380,8 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     
     # Get initial number of nodes and initial coordinates
     initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
-    initial_nBonds = len(initial_Bonds) 
+    initial_nBonds = len(initial_Bonds)
+    nBonds_beginning = initial_nBonds
     
     # Append initial information
     stretch_array.append(1.)
@@ -407,10 +408,10 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     os.system("mv %s %s" %(current_data_file, rep_path))
     
     # Apply deformation until failure is detected
-    current_inc = stretch_increment
-    inc_reduction_factor = 1
     while path_exists:
         print(100 * "=")
+        ## Update the number of chains at start of step
+        
         ## Run deformatio step
         i += 1
         err = runinc(loading, i + 1, stretch_increment, dim, main_file = 'main.in')
@@ -439,27 +440,14 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
         
         ## Check if scissions ocurred, and if yes, relax the network
         nBonds = len(DN.get_nodes_and_bonds()[1])
-        scission_detected = nBonds < initial_nBonds
+        scission_detected = nBonds < nBonds_beginning
         if scission_detected:
-            print("Scissions detected, perfoming relaxation until no more scisison are detected")
+            relax_unitl_no_scissions(data_file, dim, "main.in", nBonds_beginning)
+            nBonds_beginning = nBonds
             
-            while scission_detected:
-                ## relax network
-                err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "main.in");
-                if not err:
-                    print("relaxation completed")
-                else:
-                    breakpoint()
-                ## update DN object
-                DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
-                temp = len(DN.get_nodes_and_bonds()[1])
-                scission_detected = temp < nBonds
-                print("nChains pre-relaxation: %d" %nBonds)
-                print("nChains after-relaxation: %d" %temp)
-                nBonds = temp
-                if scission_detected:
-                    print("Doing another relaxation, as scissions were still detected")
-                    
+        ## Update DN object
+        DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object 
+        
         ## Calculate stresses
         cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
         nominal_stress = FracNetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
@@ -505,79 +493,6 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
            )
     
     return out
-
-
-def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_attempts = 4):
-    """
-    Run increments of reduced size.
-    
-    Inputs:
-    
-    Outputs:
-    
-    """
-    # Initialise variables
-    current_inc = 0
-    attempt = 0
-    reduced_inc = stretch_increment * 0.5
-    
-    # Get number of bonds in the beginning of the time step
-    DN = FracNetworkClass(data_file, "test.res", main_file)
-    nBonds_beginning = len(DN.get_nodes_and_bonds()[1])
-    
-    # Run 
-    print("Reducing in half the increment size...")
-    print("Maximum number of attempts: %d" %max_attempts)
-    while current_inc < stretch_increment:
-        err = runinc(loading, 0, reduced_inc, dim, main_file)
-        if err:
-            ## Reduce by half, and try again
-            reduced_inc *= 0.5
-            attempt += 1
-            if attempt > max_attempts:
-                print("Maximum number of attempts reached!")
-                err = True
-            print("Reduced increment did not work. Reducing more and trying again...")
-            print("Reduced attempt: %d" %attempt)
-        else:
-            ## Check if scissions ocurred during the reduced increment
-            relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning)
-            current_inc += reduced_inc
-    
-    return err
-
-def relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning):
-    
-    
-    # Create current DN object
-    DN = FracNetworkClass(data_file, "test.res", main_file) ## Netwotk object
-    
-    ## Check if scissions ocurred, and if yes, relax the network
-    nBonds = len(DN.get_nodes_and_bonds()[1])
-    scission_detected = nBonds < nBonds_beginning
-    
-    if scission_detected:
-        print("Scissions detected, perfoming relaxation until no more scisison are detected")
-        
-        while scission_detected:
-            ## relax network
-            err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = main_file);
-            if not err:
-                print("relaxation completed")
-            else:
-                break
-            ## update DN object
-            DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
-            temp = len(DN.get_nodes_and_bonds()[1])
-            scission_detected = temp < nBonds
-            print("nChains pre-relaxation: %d" %nBonds)
-            print("nChains after-relaxation: %d" %temp)
-            nBonds = temp
-            if scission_detected:
-                print("Doing another relaxation, as scissions were still detected")
-    
-    return
-
 
 
 def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_increment, 
@@ -748,7 +663,123 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     
     return out
 
+def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_attempts = 4):
+    """
+    Run increments of reduced size.
+    
+    Inputs:
+        data_file (str): name of LAMMPS data file
+        stretch_increment (float): size of increment.
+        loading (int): Type of loading (see runinc for more details).
+        dim (int) problem dimension (2 or 3).
+        main_file (str): name of LAMMPS input file
+        max_attempts (int): allowed number of increment size reduction.
+        
+    Outputs:
+        err (bool)
+    """
+    # Initialise variables
+    current_inc = 0
+    attempt = 0
+    reduced_inc = stretch_increment * 0.5
+    
+    # Get number of bonds in the beginning of the time step
+    DN = FracNetworkClass(data_file, "test.res", main_file)
+    nBonds_beginning = len(DN.get_nodes_and_bonds()[1])
+    
+    # Run 
+    print("Reducing in half the increment size...")
+    print("Maximum number of attempts: %d" %max_attempts)
+    while current_inc < stretch_increment:
+        err = runinc(loading, 0, reduced_inc, dim, main_file)
+        if err:
+            ## Reduce by half, and try again
+            reduced_inc *= 0.5
+            attempt += 1
+            if attempt > max_attempts:
+                print("Maximum number of attempts reached!")
+                err = True
+            print("Reduced increment did not work. Reducing more and trying again...")
+            print("Reduced attempt: %d" %attempt)
+        else:
+            ## Check if scissions ocurred during the reduced increment
+            print("Reduced increment worked!")
+            relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning)
+            current_inc += reduced_inc
+    
+    return err
 
+
+
+def relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning):
+    
+    
+    # Create current DN object
+    DN = FracNetworkClass(data_file, "test.res", main_file) ## Netwotk object
+    
+    ## Check if scissions ocurred, and if yes, relax the network
+    nBonds = len(DN.get_nodes_and_bonds()[1])
+    scission_detected = nBonds < nBonds_beginning
+    
+    if scission_detected:
+        print("Scissions detected, perfoming relaxation until no more scisison are detected")
+        
+        while scission_detected:
+            ## relax network
+            err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = main_file);
+            if not err:
+                print("relaxation completed")
+            else:
+                ## If error was detected, repeat simulation with reduced timestep
+                print("relaxation failed, trying with reduced timestep")
+                reduce_LAMMPS_timestep(main_file)
+                err = runinc(loading = 1, inc = 0, dl = 0, dim = dim, main_file = "small_step.in");
+                if err:
+                    breakpoint()
+                    break
+                else:
+                    print("relaxation with smaller timestep worked!!")
+                
+            
+            ## update DN object
+            DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
+            temp = len(DN.get_nodes_and_bonds()[1])
+            scission_detected = temp < nBonds
+            print("nChains pre-relaxation: %d" %nBonds)
+            print("nChains after-relaxation: %d" %temp)
+            nBonds = temp
+            if scission_detected:
+                print("Doing another relaxation, as scissions were still detected")
+    
+    return
+
+
+
+def reduce_LAMMPS_timestep(main_file):
+    """
+    Reduce the time step of LAMMPS integrator
+    """
+    
+    # Name of temporary main_file
+    temp_file = "small_step.in"
+    
+    # Read all lines from the original main_file
+    with open(main_file, "r") as f:
+        lines = f.readlines()
+        
+    # Write the temporari file
+    with open(temp_file, "w+") as f:
+        for line in lines:
+            if not "timestep" in line:
+                f.write(line)
+            elif "reset_timestep" in line:
+                f.write(line)
+            else:
+                data = line.strip("\n").split("\t")
+                deltaT = float(data[1]) / 4
+                f.write("timestep\t%g\n" %deltaT)
+        
+    return
 
 
 
@@ -1074,121 +1105,6 @@ def write_main_hybrid(simfile,posfile, Boundary,dim,model, angle_model, periodic
     return
 
 
-
-
-def write_main_angles(simfile,posfile, Boundary,dim,model, angle_model, periodic_flag = False):
-
-    """ 
-    Write the main input file for LAMMPS
-    """
-
-    min_algo='fire' #algorithm for minimization
-    dmax = 0.05      #how much a single atom can move during line search
-    #dmax = 0.1    # Only of very small it makes a difference
-    #dmax = 10
-    
-    
-    # Find bond style to be used
-    bond_style, err = get_bond_style(model)
-    if err:
-        exit()
-    
-    # Find angle style to be used
-    angle_style = get_angle_style(angle_model) 
-    
-    # Open file and start writting process
-    f = open(simfile,'w')
-
-
-    f.write('#Main input file for LAMMPS\n')
-
-    f.write('units\tlj\n')
-    f.write('dimension\t%d\n' %dim)
-    if dim == 3:
-        f.write('boundary\tf f f \n')
-    else:
-        if not periodic_flag:
-            f.write('boundary\tf f p\n')
-        else:
-            f.write('boundary\tp p p\n')
-    
-    f.write('atom_style\tmolecular\n')
-    f.write('bond_style\t%s\n' %(bond_style))
-    f.write('angle_style\t%s\n' %(angle_style))
-    f.write('atom_modify\tsort 0 0\n')
-    f.write('pair_style\tnone\n\n')
-
-    f.write('read_data\t%s\n\n' %posfile)
-
-    f.write('reset_timestep\t0\n')
-    f.write('timestep\t0.0001\n')
-    f.write('neighbor\t0.1 nsq\n') ## might need to be adjusted for PBC
-    f.write('thermo\t1\n')
-    if dim == 3:
-        f.write('thermo_style\tcustom etotal press pxx pyy pzz pxy pxz pyz\n')
-    else:
-        f.write('thermo_style\tcustom etotal press pxx pyy pxy\n')
-    
-    f.write('min_style\t%s\n' %(min_algo))
-    f.write('min_modify\tdmax %s\n\n' %(dmax))
-    
-    if not periodic_flag:
-        f.write('group\tboundary id ')
-        for i in range(len(Boundary)):
-            f.write('%s ' %(Boundary[i]))
-        f.write('\n\n')
-
-    # Step 1: deform the box affinely 
-    #delta values: change in box boundaries at the end of run  
-    #Note: actual mode of deformation applied here is not important as these lines will be replaced
-    #by run.py on the go
-    if dim == 3:
-        f.write('fix 1 all deform 1 x delta 0 0 y volume z volume remap x units box\n')
-    else:
-        if not periodic_flag:
-            f.write('fix 1 all deform 1 x delta 0 0 y volume remap x units box\n')
-        else:
-            f.write('fix 1 all deform 1 x delta 0 0 y volume remap x units box\n')
-        
-
-    #need a run to apply the fix deform command above
-    f.write('run 1\n\n')
-
-    # Step 2: Apply zero force on boundary nodes (prevent their motion) and minimize energy
-    if not periodic_flag:
-        f.write('fix\t2 boundary setforce 0 0 0\n')
-    f.write('minimize\t1e-10 1e-10 100000 10000\n\n')
-    #f.write('minimize\t0 1e-16 1000 10000\n\n')
-
-    # Step 3: remove the zero-force constraint on the boundary
-    if not periodic_flag:
-        f.write('unfix 2\n\n')
-
-    # Define computation to calculate forces
-    if dim == 3:
-        f.write('compute\t1 boundary property/atom fx fy fz\n')
-        f.write('dump\t1 boundary custom 1 test.res id type x y z c_1[1] c_1[2] c_1[3]\n')
-
-    else:
-        if not periodic_flag:
-            f.write('compute\t1 boundary property/atom fx fy\n')
-            f.write('dump\t1 boundary custom 1 test.res id type x y c_1[1] c_1[2]\n')
-            
-            f.write('dump_modify\t1 sort id\n')
-
-    #run dummy step (0 increment) to perform the dump operation and write test.res
-    f.write('run\t0\n\n')   
-    
-    #write new atom positions
-    f.write('write_data\t%s\n\n' %posfile)
-
-    f.close()
-    
-    
-    
-    return
-
-
 def writeMain(simfile,posfile,Boundary,dim,model, periodic_flag = False):
 
     """ 
@@ -1328,22 +1244,6 @@ def get_bond_style(model):
         exit()
     
     return bond_style, err
-
-def get_angle_style(model):
-    """
-    Get string identifier within lammps of the chain model used
-    
-    Inputs:
-        model (str): string informing the angle potential type
-        
-    Outputs:
-        angle_style (str): string identifier of the angle style in lammps.
-        
-    """
-    if model == '1':
-        angle_style = 'harmonic'
-    return angle_style
-
 
 def checkerror(filename):
     
