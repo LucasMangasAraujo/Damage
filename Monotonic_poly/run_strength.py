@@ -38,7 +38,8 @@ def main():
     strengths = 0.4, 0.8
     strong_fractions = 0.0, 0.2, 0.4, 0.6, 0.8, 1.0
     strong_fractions = np.arange(0.0, 1.1, 0.1)
-    Wf_array = [] ## array to store 
+    Wf_array = [] ## array to store array to store the work of fracture
+    PS_array = [] ## array to store pre-stretches
     
     for phi in strong_fractions:
         ## print information on the screen
@@ -79,11 +80,12 @@ def main():
             
         
         # After completion average results
-        averaged_results, Wf = post.average_fracture_results(results_dict, loading)
+        averaged_results, Wf, preStretch = post.average_fracture_results(results_dict, loading)
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
         
         # Average the work of fracture results
         if isinstance(Wf, float):
+            PS_array.append(preStretch)
             Wf_array.append(Wf)
         else:
             breakpoint()
@@ -96,8 +98,8 @@ def main():
     results_folder_names = "results", "strength_effect"
     results_file = "Wf.csv"
     if isinstance(Wf, float):
-        results_comments = "phi[0] Wf[1]"
-    averaged_results = strong_fractions, Wf_array
+        results_comments = "phi[0] lambda0[1], Wf[2]"
+    averaged_results = strong_fractions, PS_array, Wf_array
     post.write_results(results_folder_names, results_file, results_comments, averaged_results)
     
     return
