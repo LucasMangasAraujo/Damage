@@ -41,7 +41,7 @@ def average_fracture_results(results_dict, loading):
         fraction_broken_chains = results_dict[1][3]
         
         ## Calculate full stress depending on the loading conditions.
-        cauchy_stress, nominal_stress = full_stress(stretch_array, cauchy_rubbery, 
+        cauchy_stress, nominal_stress = nonZero_stress(stretch_array, cauchy_rubbery, 
                                                         nominal_rubbery, loading)
         
         ## Assemble output
@@ -91,7 +91,7 @@ def average_elastic_results(results_dict, loading):
         nominal_rubbery = results_dict[1][2]
         
         ## Calculate full stress depending on the loading conditions.
-        cauchy_stress, nominal_stress = full_stress(stretch_array, cauchy_rubbery, 
+        cauchy_stress, nominal_stress = nonZero_stress(stretch_array, cauchy_rubbery, 
                                                         nominal_rubbery, loading)
         
         ## Assemble output
@@ -102,7 +102,7 @@ def average_elastic_results(results_dict, loading):
     return averaged_results
 
 
-def full_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
+def nonZero_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
     """
     Obtain the non-zero stress component based on the BCx.
     

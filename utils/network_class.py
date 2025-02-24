@@ -6,6 +6,7 @@ import numpy as np
 import networkx as nx
 from collections import defaultdict
 from scipy.spatial import cKDTree
+from scipy.interpolate import UnivariateSpline
 
 class NetworkClass:
     """
@@ -27,6 +28,33 @@ class NetworkClass:
         self.data_file = data_file
         self.dump_file = dump_file
         self.input_file = input_file
+    
+    @staticmethod
+    def get_shear_modulus(stretch, cauchy_rubbery, loading):
+        """
+        Compute the small strain shear modulus
+        
+        Inputs:
+            stretch (ndarray): array with 
+            cauchy_rubbery (ndarray): principal rubbery components with units.
+            loading (int): type of loading. see sim_executor for more details.
+            
+        Outputs:
+            G (float): shear modulus (with units)
+        """
+        # Calculate Lagrange multiplier from boundary conditions
+        if loading == 1
+            Lagrange_multiplier = np.mean(cauchy_rubbery[:, 1:], axis = 1)
+            cauchy_stress = cauchy_rubbery[0] - Lagrange_multiplier
+        
+        # Interpolate
+        spline = UnivariateSpline(stretch, cauchy_stress, s=0)
+        dsigma_dlambda = spline.derivative();
+        G = dsigma_dlambda(1.0) / 3
+        
+        return G
+    
+    
     
     def get_preStretch_distr(self, model):
         """
@@ -87,8 +115,10 @@ class NetworkClass:
         return np.array(preStretch_distr)
     
     
+    
+    
     @staticmethod
-    def get_bond_coeffs(data_file):
+    def get_bond_coeffs_lines(data_file):
         """
         Get lines of the data file containing the bond coefficients
         
@@ -418,6 +448,49 @@ class FracNetworkClass(NetworkClass):
     Inherented from the NetworkClass.
     
     """
+    
+    def get_bonds_and_coeffs(self, model):
+        """
+        Get bonds and their coefficients
+        """
+        
+        # Read data file
+        with open(self.data_file,"r") as f:
+            ## Get the Bond types and their coefficients
+            key = f.readline()
+            while "Bond Coeffs" not in key:
+                key = f.readline()
+            
+            BondCoeffs = {}
+            f.readline()
+            data = f.readline().strip("\n").split(" ")
+            while len(data) > 1:
+                if model == '4':
+                    BondCoeffs[int(data[0])] = float(data[1]), float(data[2]), float(data[3])
+                
+                data = f.readline().strip("\n").split(" ")
+            
+            
+            ## Keep readin until bond section is reached
+            key = f.readline()
+            while "Bonds" not in key:
+                key = f.readline()
+            f.readline()
+            
+            ## Read bonds
+            Bonds = {}
+            data = f.readline().strip("\n").split(" ")
+            while len(data) > 1:
+                Bonds[int(data[0])] = int(data[1]), int(data[2]), int(data[3])
+                data = f.readline().strip("\n").split(" ")
+        
+        
+        return Bonds, BondCoeffs
+        
+        
+        
+        
+        return
     
     @staticmethod
     def integrate_stress_strain(nominal_stress, stretch):

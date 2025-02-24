@@ -25,3 +25,6 @@ Monotonic_poly/results/
 
 # Geometries
 Geometries/nu*
+
+# Convergence 
+Convergence/*

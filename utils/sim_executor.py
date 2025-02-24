@@ -668,6 +668,21 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
         
     return out
 
+
+
+def get_damaged_G(cur_dataFile, initial_box):
+    """
+    estimated
+    """
+    
+    
+    
+    
+    
+    return G
+
+
+
 def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_attempts = 4):
     """
     Run increments of reduced size.

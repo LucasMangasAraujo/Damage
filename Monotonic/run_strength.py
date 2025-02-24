@@ -29,41 +29,21 @@ def main():
     model = '4' ## chain model 
     dim = 3 ## problem dimension
     
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     # Declare some parameters for elastic simulations
     elastic_params = bKuhn, NKuhn, nub3
     elastic_model = '2'
-=======
->>>>>>> feature
-=======
->>>>>>> feature
-=======
->>>>>>> feature
-=======
->>>>>>> feature
     
     # Define load history
     loading = 1
     stretch_increment = 0.1
     
     # Define strengths to be testes
-    strengths = 0.2, 0.4, 0.6, 0.8
+    strengths = 0.2, 0.4, 0.6, 0.8, 0.5
+    strengths = 0.95,
+    
     
     for critical_r_Nb in strengths:
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> feature
-=======
->>>>>>> feature
-=======
->>>>>>> feature
+    
         ## print information on the screen
         print(100 * "*")
         print("Running simulations where the chains fail at r /(Nb) = %g" %critical_r_Nb)
@@ -71,16 +51,6 @@ def main():
         print("bKuhn = %g nm, NKuhn = %g, nub3 = %g" %(bKuhn, NKuhn, nub3))
         print("Failure type: %d" %failure_criterion)
         
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> feature
-=======
->>>>>>> feature
-=======
->>>>>>> feature
-=======
->>>>>>> feature
         ## Assemble parameters
         params = (bKuhn, NKuhn, nub3, critical_r_Nb)
         
@@ -111,29 +81,20 @@ def main():
             
         
         # After completion average results
-        averaged_results = post.average_fracture_results(results_dict, loading)
+        averaged_results, Wf, preStretch = post.average_fracture_results(results_dict, loading)
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
         
-=======
         print(100 * "*")
         print("\n")
->>>>>>> feature
-=======
+
+
         print(100 * "*")
         print("\n")
->>>>>>> feature
-=======
+
         print(100 * "*")
         print("\n")
->>>>>>> feature
-=======
         print(100 * "*")
         print("\n")
->>>>>>> feature
     
     return
 
