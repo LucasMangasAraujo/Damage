@@ -11,6 +11,67 @@ from scipy.spatial import cKDTree
 
 
 
+
+def bring_back_affinely(dat_file, Nodes, Bonds, stretches, initial_box):
+    """
+    Deform affinely the current DN.
+    
+    Inputs:
+        dat_file (str): name of LAMMPS data file.
+        Nodes (dict): coordinates of the nodes before deformation
+        Bonds (dict): bond types and the nodes connected.
+        stretches (ndarray): current principal stretches.
+        initial_box (dict): boundaries of the initial box.
+        
+    Outputs:
+        None
+    """
+    # Calculate stretch increments 
+    inc_stretches = np.array([stretch - 1 for stretch in stretches])
+    
+    # Deform affinelly the crosslinks
+    new_Nodes = {}
+    for idx, coord in Nodes.items():
+        temp = coord.copy()
+        temp += inc_stretches / 2
+        temp /= stretches
+        new_Nodes[idx] = temp
+        
+    
+    # Copy lines of the current DN
+    with open(dat_file, "r") as f:
+        lines = f.readlines()
+        
+    # Rewrite the data file
+    with open(dat_file, "w") as f:
+        ## Re-use some lines
+        for line in lines:
+            if "xlo" in line:
+                f.write("%g %g xlo xhi\n" %tuple(initial_box['x']))
+            elif "ylo" in line:
+                f.write("%g %g ylo yhi\n" %tuple(initial_box['y']))
+            elif "zlo" in line:
+                f.write("%g %g zlo zhi\n" %tuple(initial_box['z']))
+            elif "Atoms" in line:
+                f.write(line)
+                f.write("\n")
+                break
+            else:
+                f.write(line)
+            
+        ## Write the Nodes
+        for idx, coord in new_Nodes.items():
+            f.write('%d 1 1 %g %g %g\n' %(idx,coord[0],coord[1],coord[2]))
+        
+        ## Write Bonds
+        f.write("\n")
+        f.write("Bonds\n\n")
+        for idx, (bond_type, n1, n2) in Bonds.items():
+            f.write("%d %d %d %d\n" %(idx, bond_type, n1, n2))
+    
+    return
+
+
 def sample_weak_and_strong(strengths, strong_fraction, NKuhn, bond_ids):
     """
     Assigns a strength (weak or strong) to each bond in bond_ids while ensuring that

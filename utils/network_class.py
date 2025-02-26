@@ -35,7 +35,7 @@ class NetworkClass:
         Compute the small strain shear modulus
         
         Inputs:
-            stretch (ndarray): array with 
+            stretch (ndarray): streches.
             cauchy_rubbery (ndarray): principal rubbery components with units.
             loading (int): type of loading. see sim_executor for more details.
             
@@ -43,14 +43,15 @@ class NetworkClass:
             G (float): shear modulus (with units)
         """
         # Calculate Lagrange multiplier from boundary conditions
-        if loading == 1
+        if loading == 1:
             Lagrange_multiplier = np.mean(cauchy_rubbery[:, 1:], axis = 1)
-            cauchy_stress = cauchy_rubbery[0] - Lagrange_multiplier
+            cauchy_stress = cauchy_rubbery[:, 0] - Lagrange_multiplier
         
         # Interpolate
         spline = UnivariateSpline(stretch, cauchy_stress, s=0)
         dsigma_dlambda = spline.derivative();
-        G = dsigma_dlambda(1.0) / 3
+        if loading == 1:
+            G = dsigma_dlambda(1.0) / 3
         
         return G
     
@@ -323,6 +324,7 @@ class NetworkClass:
         Outputs:
             box_lengths
         """
+        box_boundaries = {}
         box_lengths = {}
         # Read file
         with open(self.data_file, "r") as f:
@@ -333,17 +335,21 @@ class NetworkClass:
             ## Read x length
             data = key.strip("\n").split(" ")
             box_lengths['x'] = float(data[1]) - float(data[0])
+            box_boundaries['x'] = float(data[0]), float(data[1])
             
             ## Read y length
             data = f.readline().strip("\n").split(" ")
             box_lengths['y'] = float(data[1]) - float(data[0])
+            box_boundaries['y'] = float(data[0]), float(data[1])
             
             ## Finally z length
             data = f.readline().strip("\n").split(" ")
             box_lengths['z'] = float(data[1]) - float(data[0])
+            box_boundaries['z'] = float(data[0]), float(data[1])
+            
         
         
-        return box_lengths
+        return box_boundaries, box_lengths
     
     
     
@@ -486,11 +492,6 @@ class FracNetworkClass(NetworkClass):
         
         
         return Bonds, BondCoeffs
-        
-        
-        
-        
-        return
     
     @staticmethod
     def integrate_stress_strain(nominal_stress, stretch):

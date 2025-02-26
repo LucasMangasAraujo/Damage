@@ -32,7 +32,7 @@ def main():
     
     # Define load history
     loading = 1
-    stretch_increment = 0.1
+    stretch_increment = 0.05
     
     # Define strengths to be tested
     strengths = 0.4, 0.8
@@ -72,11 +72,11 @@ def main():
         else:
             ## Run representative simulation
             out = sim.runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_increment,
-                                                failure_criterion, data_file, rep_folder_names, 
-                                                strengths, phi)
+                                                failure_criterion, data_file, strengths, phi, 
+                                                rep_folder_names)
             results_dict[1] = out
             
-            results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3]"
+            results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3] G[4]"
             
         
         # After completion average results
