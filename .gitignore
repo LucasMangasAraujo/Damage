@@ -23,6 +23,16 @@ Monotonic_poly/*.lammps
 Monotonic_poly/rep_DNs/
 Monotonic_poly/results/
 
+# Cyclic folders
+Cyclic/*.dat
+Cyclic/*.in
+Cyclic/*.res
+Cyclic/log
+Cyclic/*.lammps
+Cyclic/rep_DNs/
+Cyclic/results/
+
+
 # Geometries
 Geometries/nu*
 

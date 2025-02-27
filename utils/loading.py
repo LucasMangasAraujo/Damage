@@ -4,6 +4,66 @@ Script containing functions responsible to generate loading informatio and varia
 import numpy as np
 
 
+
+def check_loop_stability(previous_peak, current_peak):
+    """
+    Check hysteresis loop is stable
+    """
+    # Check if current peak stress is equal to the previous one
+    updated_peak_stress = 0.
+    if np.isclose(previous_peak, current_peak, atol = 1e-6):
+        ## Loop is stable
+        print("Loop has stabelised")
+        is_stable = True
+    elif current_peak < previous_peak:
+        print("Loop has stabelised")
+        print("The current peak is smaller than the previous one")
+        updated_peak_stress = current_peak
+        is_stable = False
+    else:
+        print("Loop has stabelised")
+        print("The current peak is greater than the previous one")
+        updated_peak_stress = current_peak
+        is_stable = False
+    
+    # Print previois and current peaks on the screen
+    print("Previous rubbery peak: %g" %previous_peak)
+    print("Current rubbery peak: %g" %current_peak)
+    
+    return is_stable, updated_peak_stress
+
+def reverse_load(peak, stretch, previous_stretch_increment):
+    """
+    Check if peak was reached
+    """
+    # Check if peak was reached
+    if np.isclose(peak, stretch):
+        ## Invert loading direction and set peak flag to true
+        current_stretch_increment = -previous_stretch_increment
+        is_peak = True
+        
+        ## Print informatio on the screen
+        print("Peak stretch reached, reversing load")
+        
+    elif np.isclose(1, stretch):
+        ## Invert loading direction and set peak flag to False
+        current_stretch_increment = -previous_stretch_increment
+        is_peak = False
+        
+        ## Print information on the screen
+        print("Material is unloaded.")
+        
+    else:
+        ## Nothing to do
+        current_stretch_increment = previous_stretch_increment
+        is_peak = False
+        
+        ## Print information on the screen
+        print("Peak not reached nor material is unloaded.")
+    
+    return current_stretch_increment, is_peak
+
+
 def get_loading_style(loading):
     """
     Get loading style based on the loading input.
