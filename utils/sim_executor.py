@@ -1120,10 +1120,10 @@ def get_damaged_G(DN, DN_initial, dim, model, computational_bKuhn, bKuhn):
     Bonds, BondCoeffs = DN.get_bonds_and_coeffs(model)
     
     # Get initial box lengths and boundaries
-    initial_box, initial_lengths = DN_initial.get_box_lengths()
+    initial_box, initial_lengths = DN_initial.get_box()
     
     # Get current box length, and calcualte stretches
-    _, lengths = DN.get_box_lengths()
+    _, lengths = DN.get_box()
     stretches = np.array([L / initial_lengths[key] for key, L in lengths.items()])
     
     # Copy current data file and bring it back to F = I

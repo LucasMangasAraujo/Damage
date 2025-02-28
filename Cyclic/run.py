@@ -29,7 +29,7 @@ def main():
     # Define load type and increment size
     loading = 1
     stretch_increment = 0.1
-    peak_stretches = (2.5, 3, 4), (3, 4, 4.5), (4, 5, 5.3)
+    peak_stretches = (2.5, 3, 4), (4., 4.5, 4.8), (4, 5, 5.3)
     
     # Declare chain parameters
     bKuhn, NKuhn = (1, 100)## Kuhn length (nm) and Number of Kuhn segments
@@ -51,6 +51,7 @@ def main():
         ## Initliase the array for storing information
         Wf_array = [] ## array to store 
         PS_array = []
+        if i + 1 != 2: continue
         
         ## Loop over the pre-stretches
         for j in range(nPreStretches):

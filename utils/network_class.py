@@ -194,7 +194,8 @@ class NetworkClass:
         G = nx.Graph();
         G.add_nodes_from(Nodes);
         for idx, (n1,n2) in Bonds.items():
-            G.add_edge(n1,n2);
+            dist = np.linalg.norm(Nodes[n1] - Nodes[n2])
+            G.add_edge(n1,n2, weigth = dist);
         
         return G
 
@@ -315,7 +316,7 @@ class NetworkClass:
         return Nodes, Bonds
     
     
-    def get_box_lengths(self):
+    def get_box(self):
         """
         Get current box bounds.
         

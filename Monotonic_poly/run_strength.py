@@ -77,6 +77,7 @@ def main():
             results_dict[1] = out
             
             results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3] G[4]"
+            results_file = "data_rep.csv"
             
         
         # After completion average results

@@ -32,6 +32,16 @@ Cyclic/*.lammps
 Cyclic/rep_DNs/
 Cyclic/results/
 
+# Cyclic folders
+Cyclic_poly/*.dat
+Cyclic_poly/*.in
+Cyclic_poly/*.res
+Cyclic_poly/log
+Cyclic_poly/*.lammps
+Cyclic_poly/rep_DNs/
+Cyclic_poly/results/
+
+
 
 # Geometries
 Geometries/nu*
