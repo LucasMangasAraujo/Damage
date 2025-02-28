@@ -120,6 +120,7 @@ def deformation_gradient(loading, stretch):
             1: uniaxial tension
             2: biaxial tension TO DO
             3: pure shear TO DO
+            4: uniaxial tension in direction 2 (yy)
             
         stretch (float): scalar charactherising the load "magnitude".
         
@@ -134,5 +135,8 @@ def deformation_gradient(loading, stretch):
     if loading == 1:
         F[0] = stretch
         F[1], F[2] = 1 / np.sqrt(stretch), 1 / np.sqrt(stretch)
+    elif loading == 4:
+        F[1] = stretch
+        F[0], F[2] = 1 / np.sqrt(stretch), 1 / np.sqrt(stretch)
     
     return F

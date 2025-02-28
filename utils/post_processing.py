@@ -181,6 +181,12 @@ def nonZero_stress(stretch_array, cauchy_rubbery, nominal_rubbery, loading):
         ## Calculate the nominal stress
         nominal_stress = nominal_rubbery[:, 0] - (Lagrange_multiplier / stretch_array)
         
+    elif loading == 4:
+        temp = np.column_stack((cauchy_rubbery[:, 0], cauchy_rubbery[:, 2]), )
+        Lagrange_multiplier = np.mean(temp, axis = 1)
+        cauchy_stress = cauchy_rubbery[:, 1] - Lagrange_multiplier
+        
+        nominal_stress = nominal_rubbery[:, 1] - (Lagrange_multiplier / stretch_array)
     
     
     return cauchy_stress, nominal_stress

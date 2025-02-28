@@ -37,20 +37,26 @@ class NetworkClass:
         Inputs:
             stretch (ndarray): streches.
             cauchy_rubbery (ndarray): principal rubbery components with units.
-            loading (int): type of loading. see sim_executor for more details.
+            loading (int): type of loading. see loading.py for more details.
             
         Outputs:
             G (float): shear modulus (with units)
         """
         # Calculate Lagrange multiplier from boundary conditions
         if loading == 1:
+            ## Uniaxial tension direction 1
             Lagrange_multiplier = np.mean(cauchy_rubbery[:, 1:], axis = 1)
             cauchy_stress = cauchy_rubbery[:, 0] - Lagrange_multiplier
+        elif loading == 4:
+            ## Uniaxial tension in direction 2
+            temp = np.column_stack((cauchy_rubbery[:, 0], cauchy_rubbery[:, 2]), )
+            Lagrange_multiplier = np.mean(temp, axis = 1)
+            cauchy_stress = cauchy_rubbery[:, 1] - Lagrange_multiplier
         
         # Interpolate
         spline = UnivariateSpline(stretch, cauchy_stress, s=0)
         dsigma_dlambda = spline.derivative();
-        if loading == 1:
+        if loading in [1, 4]:
             G = dsigma_dlambda(1.0) / 3
         
         return G
