@@ -30,7 +30,7 @@ def main():
     loading_xx = 1
     loading_yy = 4
     stretch_increment = 0.1
-    peak_stretches = (4,), ((4.8, ), (4.2, )), (5.3, )
+    peak_stretches = (4,), ((4.8, ), (4.4, )), (5.3, )
     #peak_stretches = (4,), ((1.5, ), (1.2, )), (5.3, )
     
     # Declare chain parameters

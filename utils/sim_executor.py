@@ -1266,9 +1266,10 @@ def runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_
             print("G = %g kPa" %G)
             
             ## Move geometry to representative folder
-            current_data_file = "Step_" + str(i) + ".dat"
-            os.system("cp %s %s" %(data_file, current_data_file))
-            os.system("mv %s %s" %(current_data_file, rep_path))
+            if i % 10 == 0:
+                current_data_file = "Step_" + str(i) + ".dat"
+                os.system("cp %s %s" %(data_file, current_data_file))
+                os.system("mv %s %s" %(current_data_file, rep_path))
             
             ## Check at which stage of the loading we are
             current_stretch_increment, is_peak = reverse_load(peak, stretch_array[-1], current_stretch_increment)
@@ -1477,10 +1478,11 @@ def runsim_cyclic_anisotropy_rep(model, params, dim, loading, stretch_increment,
             print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
             print("G = %g kPa" %G)
             
-            ## Move geometry to representative folder
-            current_data_file = "Step_" + str(i) + ".dat"
-            os.system("cp %s %s" %(data_file, current_data_file))
-            os.system("mv %s %s" %(current_data_file, rep_path))
+            ## Move geometry to representative folder every 10 time-steps
+            if i % 10 == 0:
+                current_data_file = "Step_" + str(i) + ".dat"
+                os.system("cp %s %s" %(data_file, current_data_file))
+                os.system("mv %s %s" %(current_data_file, rep_path))
             
             ## Check at which stage of the loading we are
             current_stretch_increment, is_peak = reverse_load(peak, stretch_array[-1], current_stretch_increment)
