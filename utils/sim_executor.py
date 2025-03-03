@@ -1172,7 +1172,7 @@ def runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_
     nominal_stress_array.append(nominal_stress)
     
     # Calculare the shear modulus
-    G = get_damaged_G(DN_initial, DN_initial, dim, model, computational_params[0], bKuhn)
+    G = get_damaged_G(DN_initial, DN_initial, dim, model, computational_params[0], bKuhn, loading)
     G_array.append(G)
     
     # Query for initial failure
@@ -1425,7 +1425,7 @@ def runsim_cyclic_anisotropy_rep(model, params, dim, loading, stretch_increment,
             ## Run deformatio step
             i += 1
             err = runinc(loading, i + 1, current_stretch_increment, dim, main_file = 'main.in')
-            
+            breakpoint()
             ## Check if simulation was aborted
             if err:
                 print("Increment failed")

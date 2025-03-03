@@ -1,8 +1,7 @@
 """
 Script running cyclic loading conditions where the network 
-is uniform in terms of spring parameters. This code is used to
-to test what happens when there is a Bimodal distribution of chain
-strength.
+This code is used to to test what happens when there is a 
+Bimodal distribution of chain strength.
 
 """
 
