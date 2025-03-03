@@ -1252,7 +1252,7 @@ def runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_
             
             ## Calculate the damaged shear modulus if scissions were detected
             if scission_detected:
-                G = get_damaged_G(DN, DN_initial, dim, model, computational_params[0], bKuhn)
+                G = get_damaged_G(DN, DN_initial, dim, model, computational_params[0], bKuhn, loading)
             
             ## Append current stress to the stress array
             cauchy_stress_array.append(cauchy_stress)
