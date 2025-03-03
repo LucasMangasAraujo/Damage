@@ -44,7 +44,6 @@ def main():
     # Define strengths to be tested
     strengths = 0.4, 0.8
     strong_fractions = 0.0, 0.6, 0.7, 1.0
-    strong_fractions = 0.5,
     
     ## Define the peak stresses
     peak_stretches = ((2.5, ), (1.9, )), ((4.5, ), (4.0, )), ((6., ), (4., )), ((6., ), (5.5, ))
@@ -90,7 +89,7 @@ def main():
             results_file_yy = "data_rep_yy.csv"
             out_yy = sim.runsim_cyclic_anisotropy_rep(model, params, dim, loading_yy, stretch_increment,
                                                         peak_stretches[k][1], out_xx[0][-1], failure_criterion, 
-                                                        data_file, rep_folder_names_yy)
+                                                        data_file, True, rep_folder_names_yy)
             
             ## Run ciclic simulation in the 
             results_dict_xx[1] = out_xx

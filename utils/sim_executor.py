@@ -1314,7 +1314,8 @@ def runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_
 
 
 def runsim_cyclic_anisotropy_rep(model, params, dim, loading, stretch_increment, peak_stretches, 
-                                    last_stretch, failure_criterion, data_file, folder_names):
+                                    last_stretch, failure_criterion, data_file, poly_flag, 
+                                    folder_names):
     """
     Run cyclic simulation to probe anisitropy
     
@@ -1330,6 +1331,7 @@ def runsim_cyclic_anisotropy_rep(model, params, dim, loading, stretch_increment,
         stretch_increment (float):
         peak_stretches (tuple): peak stretches to be probed
         failure_criterion (int): 
+        data_file (int): name of LAMMPS data file.
         folder_names (tuple): string to form path where geometries will be placed
     
     Outputs:
@@ -1337,8 +1339,10 @@ def runsim_cyclic_anisotropy_rep(model, params, dim, loading, stretch_increment,
     """
     
     # Unpack parameters tuple, which mighht vary depending of the chain model
-    if int(model) == 4:
+    if int(model) == 4 and not poly_flag:
         bKuhn, NKuhn, nub3, critical_r_Nb = params
+    elif poly_flag: ## network has either different chain lengths of chain strengths
+        bKuhn, NKuhn, nub3 = params
     
     # Creat folde to receive
     rep_path = Path(*folder_names) ## create folder
@@ -1425,7 +1429,7 @@ def runsim_cyclic_anisotropy_rep(model, params, dim, loading, stretch_increment,
             ## Run deformatio step
             i += 1
             err = runinc(loading, i + 1, current_stretch_increment, dim, main_file = 'main.in')
-            breakpoint()
+            
             ## Check if simulation was aborted
             if err:
                 print("Increment failed")
