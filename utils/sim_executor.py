@@ -736,9 +736,12 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
         bKuhn, NKuhn, nub3 = params 
         
     
-    # Creat folde to receive
+    # Creat folder to receive representative DNs, and remove data from previous simulations
     rep_path = Path(*folder_names) ## create folder
     rep_path.mkdir(parents = True, exist_ok = True)
+    for file in rep_path.iterdir():
+        if file.is_file():
+            file.unlink()
     
     # Initialise output array
     stretch_array = []
@@ -1666,6 +1669,7 @@ def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_a
             if attempt > max_attempts:
                 print("Maximum number of attempts reached!")
                 err = True
+                if err: breakpoint()
             print("Reduced increment did not work. Reducing more and trying again...")
             print("Reduced attempt: %d" %attempt)
         else:

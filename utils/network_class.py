@@ -462,6 +462,31 @@ class FracNetworkClass(NetworkClass):
     
     """
     
+    def create_DN_graph_strength(self):
+        """
+        Turn DN into Graph, with strand strength as the weights
+        
+        Inputs:
+            None
+            
+        Outputs:
+            G (networkx Graph): networkx graph object.
+        """
+        # Get Network structure
+        Nodes, _ = self.get_nodes_and_bonds()
+        Bonds, Coeffs = self.get_bonds_and_coeffs()
+        
+        # Create Graph
+        G = nx.Graph();
+        G.add_nodes_from(Nodes);
+        for idx, (bond_type, n1,n2) in Bonds.items():
+            strength = Coeffs[bond_type][-1]
+            G.add_edge(n1,n2, weigth = strength);
+        
+        return G
+    
+    
+    
     def get_bonds_and_coeffs(self, model):
         """
         Get bonds and their coefficients
