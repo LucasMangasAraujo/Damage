@@ -36,9 +36,7 @@ def main():
     
     # Define strengths to be tested
     strengths = 0.4, 0.8
-    strong_fractions = 0.0, 0.2, 0.4, 0.6, 0.8, 1.0
     strong_fractions = np.arange(0.0, 1.1, 0.1)
-    strong_fractions = np.arange(0.6, 1., 0.1)
     Wf_array = [] ## array to store array to store the work of fracture
     PS_array = [] ## array to store pre-stretches
     
@@ -100,7 +98,7 @@ def main():
     results_folder_names = "results", "strength_effect"
     results_file = "Wf.csv"
     if isinstance(Wf, float):
-        results_comments = "phi[0] lambda0[1], Wf[2]"
+        results_comments = "phi[0], lambda0[1], Wf[2]"
     averaged_results = strong_fractions, PS_array, Wf_array
     post.write_results(results_folder_names, results_file, results_comments, averaged_results)
     

@@ -45,6 +45,7 @@ Cyclic_poly/results/
 
 # Geometries
 Geometries/nu*
+Geometries/Chain_length/
 
 # Convergence 
 Convergence/*
