@@ -12,6 +12,26 @@ from scipy.spatial import cKDTree
 
 
 
+def find_peak_stretches(stron_fraction, peak_fractions, monotonic_path):
+    """
+    Return peak stretches for cyclic simulations
+    """
+    # Acess monotonic data
+    data = np.loadtxt(monotonic_path, delimiter = ",")
+    stretch, nominal= data[:,0], data[:,2]
+    
+    # Find the stretch corresponding ot the peak stretch
+    idx_peak_stress = np.argmax(nominal)
+    peak_stretch = stretch[idx_peak_stress]
+    
+    # Compute the peak streches
+    peak_stretches = [round(alpha * peak_stretch, 1) for alpha in peak_fractions]
+    
+    
+    return tuple(peak_stretches)
+
+
+
 def bring_back_affinely(dat_file, Nodes, Bonds, stretches, initial_box):
     """
     Deform affinely the current DN.

@@ -10,6 +10,7 @@ sys.path.append("..//")
 from utils.loading import create_monotonic_load, get_loading_style
 import utils.sim_executor as sim
 import utils.post_processing as post
+from utils.pre_processing import find_peak_stretches
 import numpy as np
 
 def main():
@@ -36,12 +37,11 @@ def main():
     
     # Define strengths to be tested
     strengths = 0.4, 0.8
-    strong_fractions = 0.0, 0.5, 0.7, 1.0
-    strong_fractions = 0.5,
+    strong_fractions = 0.0, 0.3, 0.5, 0.7, 1.0
     
     ## Define the peak stresses
     peak_stretches = (1.5, 2.0, 2.3),  (2, 4, 8.), (4, 5, 6), (5, 5.5, 6.0)
-    peak_stretches = (4, 5, 6.), 
+    peak_fractions = (0.5, 0.7, 0.9)
     
     for k, phi in enumerate(strong_fractions):
         ## print information on the screen
@@ -73,15 +73,19 @@ def main():
         else:
             ## Assemble folder to receive rep DNs
             rep_folder_names = "rep_DNs", "strength_effect", str(round(phi, 1)) + "_strong"
+            results_comments = "# stretch[0], true[1], nominal[2], fraction_broken[3], G[4]"
+            results_file = "data_rep.csv"
+            
+            ## Based on the rep curve find the set of peak stretches to be tested
+            monotonic_path = "..//Monotonic_poly//results//strength_effect//" + str(round(phi, 1)) + "_strong//" + results_file
+            peak_stretches = find_peak_stretches(phi, peak_fractions, monotonic_path)
             
             ## Run representative simulation
             out = sim.runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_increment, 
-                                                peak_stretches[k], failure_criterion, data_file, strengths, 
+                                                peak_stretches, failure_criterion, data_file, strengths, 
                                                 phi, rep_folder_names)
             results_dict[1] = out
             
-            results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3] G[4]"
-            results_file = "data_rep.csv"
             
         
         # After completion average results

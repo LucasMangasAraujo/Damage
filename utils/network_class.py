@@ -29,6 +29,66 @@ class NetworkClass:
         self.dump_file = dump_file
         self.input_file = input_file
     
+    
+    def get_avg_preStretch(self, model):
+        """
+        Return the rms pre-stretch
+        
+        Inputs:
+            model (str): type of chain model used. See sim_exectutor.py
+                         for details.
+        
+        Outputs:
+            lambda0 (float): root-mean-square pre-stretch
+        """
+        
+        # Get the pre-stretch distributio
+        preStretch_distr = self.get_preStretch_distr(model)
+        
+        # Take the average 
+        avg_squared_preStretch = np.mean(np.square(preStretch_distr))
+        
+        return np.sqrt(avg_squared_preStretch)
+    
+    def get_rms_r0(self):
+        """
+        Inputs:
+            None
+            
+        Outputs:
+            root mean square end-to-end distance
+        """
+        # Calculate distances in the network
+        distances = np.array(tuple(self.get_distances().values()))
+        
+        # Obtain root mean square values
+        rms_r0 = np.sqrt(np.mean(distances **2))
+        
+        return rms_r0
+    
+    def get_interpenetration(self):
+        """
+        Get the degree of interpenetration
+        
+        Inputs:
+            nu (float): chain density in 1/nm3
+            
+        Outputs:
+            
+        """
+        
+        # Calculate diamond distance
+        Nodes, _ = self.get_nodes_and_bonds()
+        Boundary = self.get_boundary()
+        n = 2 * (len(Nodes) -  len(Boundary))
+        rd = np.sqrt(3) / np.power(4 * n, 1/3)
+        
+        # calculate
+        distances = np.array(tuple(self.get_distances().values()))
+        xi = np.sqrt(np.mean(distances**2)) / rd
+        
+        return xi
+    
     @staticmethod
     def get_shear_modulus(stretch, cauchy_rubbery, loading):
         """
@@ -60,7 +120,6 @@ class NetworkClass:
             G = dsigma_dlambda(1.0) / 3
         
         return G
-    
     
     
     def get_preStretch_distr(self, model):
