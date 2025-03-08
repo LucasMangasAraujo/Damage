@@ -521,6 +521,49 @@ class FracNetworkClass(NetworkClass):
     
     """
     
+    def compute_fractions_weak_strong(self, initial_Bonds, initial_Coeffs, strengths):
+        """
+        Get fraction of weak and strong broken chains.
+        
+        Inputs:
+            initial_Bonds (dict): contains bond type and the nodes connected
+            initial_Coeffs (dict): chain parameters for a given bond type.
+            strengths (tuple): strength of weak and strong chains.
+            
+        Outputs:
+            weak_fraction (float): fraction of broken weak chains
+            strong_fraction (float): fraction of strong broken chains.
+            
+        """
+        # Get current bonds and initial mumber of chains
+        _, Bonds = self.get_nodes_and_bonds()
+        nBonds_initial = len(initial_Bonds)
+        
+        # Transform the edges of the graph into sets for finding the broken bonds
+        ref_set = set(tuple(sorted([n1, n2])) for idx, n1, n2 in initial_Bonds.values())
+        cur_set = set(tuple(sorted(bond)) for bond in Bonds.values())
+        
+        # Find the bonds that were broken
+        broken_bonds = ref_set - cur_set
+        broken_bonds_idx = [idx for idx, (bond_type, n1, n2) in initial_Bonds.items() if tuple(sorted([n1, n2])) in broken_bonds]
+        
+        # Count each bond type
+        weak_fraction, strong_fraction = 0, 0
+        weak, strong = sorted(list(strengths))
+        for idx in broken_bonds_idx:
+            chain_strength = initial_Coeffs[initial_Bonds[idx][0]][-1]
+            if np.isclose(chain_strength, weak):
+                weak_fraction += 1
+            else:
+                strong_fraction += 1
+            
+        
+        
+        return weak_fraction / nBonds_initial, strong_fraction / nBonds_initial
+    
+    
+    
+    
     def create_DN_graph_strength(self, model):
         """
         Turn DN into Graph, with strand strength as the weights

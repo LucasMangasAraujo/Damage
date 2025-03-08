@@ -19,7 +19,8 @@ def main():
     data_file = "DN.dat"
     nRepeats = 1
     rep_sim_flag = True ## flag indicating that a representative simulation alone should be performed
-    
+    if rep_sim_flag:
+        import utils.sim_executor_rep as sim_rep
     
     # Declare chain parameters
     bKuhn, NKuhn = (1, 100)## Kuhn length (nm) and Number of Kuhn segments
@@ -70,17 +71,17 @@ def main():
             results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3]"
         else:
             ## Run representative simulation
-            out = sim.runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_increment,
+            out = sim_rep.runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_increment,
                                                 failure_criterion, data_file, strengths, phi, 
                                                 rep_folder_names)
             results_dict[1] = out
             
-            results_comments = "# stretch[0] true[1] nominal[2] fraction_broken[3] G[4]"
+            results_comments = "# stretch[0], true[1], nominal[2], fraction_broken[3], G[4], r0[5], weak[6], strong[7]"
             results_file = "data_rep.csv"
             
         
         # After completion average results
-        averaged_results, Wf, preStretch = post.average_fracture_results(results_dict, loading)
+        averaged_results, Wf, preStretch = post.average_bimodalStrength_results(results_dict, loading)
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
         
         # Average the work of fracture results

@@ -261,6 +261,9 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     nominal_stress_array = [] ## for now a list
     fraction_broken_chains = []
     G_array = []
+    r0_array = []
+    fraction_broken_weak = []
+    fraction_broken_strong = []
     i = 0 ## increment counter
     
     # Relax as generated network
@@ -272,25 +275,32 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     os.system("cp %s DN_ref.dat" %data_file)
     DN_initial = FracNetworkClass("DN_ref.dat", "test.res", "main.in") ## reference configuration
     computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
-    cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
-    nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
     
-    # Get pre-stretch of the network
+    # Calculate rubbery stress components in the reference configuration
+    cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
+    nominal_stress = FracNetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+    
+    # Get pre-stretch of the network, and initial rms distance
     preStretch_distr = DN_initial.get_preStretch_distr(model)
+    avg_preStretch = np.sqrt(np.mean(preStretch_distr**2))
+    xi = DN_initial.get_interpenetration()
+    print("The average pre-stretch is %g and xi = %g" %(avg_preStretch, xi))
     
     # Get initial number of nodes and initial coordinates
-    initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
+    initial_Nodes, _ = DN_initial.get_nodes_and_bonds()
+    initial_Bonds, initial_Coeffs = DN_initial.get_bonds_and_coeffs(model)
     initial_nBonds = len(initial_Bonds)
     nBonds_beginning = initial_nBonds
+    
+    # Calculare the shear modulus and initial r0
+    G, rms_r0 = get_damaged_G(DN_initial, DN_initial, dim, model, computational_params[0], bKuhn, loading)
     
     # Append initial information
     stretch_array.append(1.)
     cauchy_stress_array.append(cauchy_stress)
     nominal_stress_array.append(nominal_stress)
-    
-    # Calculare the shear modulus
-    G = get_damaged_G(DN_initial, DN_initial, dim, model, computational_params[0], bKuhn, loading)
     G_array.append(G)
+    r0_array.append(rms_r0)
     
     # Query for initial failure
     path_exists = DN_initial.any_path(failure_criterion, initial_Nodes)
@@ -300,9 +310,12 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
     print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
     print("G = %g kPa" %G)
+    
     if path_exists:
         print("No connectivity issues found in the reference configuration, proceed")
         fraction_broken_chains.append(0.)
+        fraction_broken_weak.append(0.)
+        fraction_broken_strong.append(0.)
     else:
         print("Connectivity problems found, aborting simulation")
         
@@ -358,13 +371,14 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
         
         ## Calculate the damaged shear modulus
         if scission_detected:
-            G = get_damaged_G(DN, DN_initial, dim, model, computational_params[0], bKuhn, loading)
+            G, rms_r0 = get_damaged_G(DN, DN_initial, dim, model, computational_params[0], bKuhn, loading)
             
         
         ## Append current stress to the stress array
         cauchy_stress_array.append(cauchy_stress)
         nominal_stress_array.append(nominal_stress)
         G_array.append(G)
+        r0_array.append(rms_r0)
         
         ## Print currrent step data
         print("F_11 = %g, F_22 = %g, F_33 = %g" %tuple(F))
@@ -377,13 +391,26 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
         os.system("cp %s %s" %(data_file, current_data_file))
         os.system("mv %s %s" %(current_data_file, rep_path))
         
-        ## Assess if failure occurred
+        ## Calculate the fraction of broken chains, and query the contribution of each type
         nBonds = len(DN.get_nodes_and_bonds()[1]) 
         fraction_broken_chains.append((initial_nBonds - nBonds) / initial_nBonds)
+        if scission_detected:
+            ## Call DN method to find the fraction of wach type broken
+            weak_fraction, strong_fraction = DN.compute_fractions_weak_strong(initial_Bonds, initial_Coeffs, strengths)
+            fraction_broken_weak.append(weak_fraction)
+            fraction_broken_strong.append(strong_fraction)
+        else:
+            fraction_broken_weak.append(fraction_broken_weak[-1])
+            fraction_broken_strong.append(fraction_broken_strong[-1])
+        
+        ## Assess if failure occurred
         path_exists = DN.any_path(failure_criterion, initial_Nodes)
         if path_exists:
             print("Failure not detected. Move to next increment")
             print("%g percent of chains are broken" %(100 * fraction_broken_chains[-1]))
+            print("%g of the broken chains were weak" %(100 * fraction_broken_weak[-1]))
+            print("%g of the broken chains were strong" %(100 * fraction_broken_strong[-1]))
+            
         else:
             print("Failure detected at increment %d" %i)
             print("Failure occurred with %g percent of broken chains" %(100 * fraction_broken_chains[-1]))
@@ -399,9 +426,11 @@ def runsim_frac_multi_rep(geometry_file, model, params, dim, loading, stretch_in
     cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
     nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     out = (np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), 
-                np.array(fraction_broken_chains), np.array(G_array), preStretch_distr
+                np.array(fraction_broken_chains), np.array(G_array), np.array(r0_array), 
+                np.array(fraction_broken_weak), np.array(fraction_broken_strong),
+                preStretch_distr
            )
-        
+    
     return out
 
 
