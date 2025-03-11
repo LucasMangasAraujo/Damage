@@ -10,11 +10,76 @@ from collections import defaultdict
 from scipy.spatial import cKDTree
 
 
+def sample_short_and_long(chain_lengths, long_fraction, bond_strength, bond_ids):
+    """
+    Assigns a length (short or long) to each bond in bond_ids while ensuring that
+    the fraction of long bonds matches the specified long_fraction.
+    
+    Inputs:
+        strengths (list): chain strengths
+        stron_fraction (float): fraction of strong chains.
+        NKuhn (float): Chain length.
+        bond_ids (iterable): ids of the bonds.
+    
+    Outputs:
+        BondTypes (dict): chain length and strength of each bond.
+    
+    """
+    # Ensure strengths are sorted
+    short, long = sorted(chain_lengths)
+    
+    # Calculate how many chains should be sampled
+    nLong = int(long_fraction * len(bond_ids))
+    
+    # Sample randomly nStrong bonds from the ids of the bonds
+    long_bonds = set(random.sample(bond_ids, nLong))
+    
+    # Assign
+    BondTypes = {}
+    for idx in bond_ids:
+        NKuhn = long if idx in long_bonds else short
+        BondTypes[idx] = NKuhn, bond_strength
+        
+    
+    return BondTypes
+
+
+
+
+def get_long_chain(long_fraction, N_short, N_average):
+    """
+    Get the number of segments in long chain for a given fraction 
+    of long chains and number of segments in the short chains, and
+    a given average chain length.
+    
+    Inputs:
+        long_fraction (float): fraction of long chains.
+        N_short (float): length of the short chains.
+        N_average (float): average chain length.
+        
+    Outputs:
+        N_long (float): Number of Kuhn segments in the long chain.
+    """
+    # Check if fraction is not zero
+    if np.isclose(long_fraction, 0.0):
+        print("Long chain in infinitely long, check if numbers make sense...")
+        breakpoint()
+        
+    
+    # Use the expression for the average length in Bimodal distribution
+    N_long = ((N_average -  N_short) / long_fraction) + N_short
+    
+    return N_long
 
 
 def find_peak_stretches(stron_fraction, peak_fractions, monotonic_path):
     """
     Return peak stretches for cyclic simulations
+    
+    Inputs:
+        strong_fraction (float): fraction of strong chains.
+        peak_fractions (tuple): fraction of the peak stretch.
+        monotonic_path (str): full path to access monotonic loading data.
     """
     # Acess monotonic data
     data = np.loadtxt(monotonic_path, delimiter = ",")

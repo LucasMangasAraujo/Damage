@@ -521,6 +521,48 @@ class FracNetworkClass(NetworkClass):
     
     """
     
+    def compute_fractions_short_long(self, initial_Bonds, initial_Coeffs, chain_lengths):
+        """
+        Get fraction of short and long broken chains.
+        
+        Inputs:
+            initial_Bonds (dict): contains bond type and the nodes connected
+            initial_Coeffs (dict): chain parameters for a given bond type.
+            chain_lengths (tuple): length of short and long chains.
+            
+        Outputs:
+            short_fraction (float): fraction of broken short chains
+            long_fraction (float): fraction of long broken chains.
+            
+        """
+        # Get current bonds and initial mumber of chains
+        _, Bonds = self.get_nodes_and_bonds()
+        nBonds_initial = len(initial_Bonds)
+        
+        # Transform the edges of the graph into sets for finding the broken bonds
+        ref_set = set(tuple(sorted([n1, n2])) for _, n1, n2 in initial_Bonds.values())
+        cur_set = set(tuple(sorted(bond)) for bond in Bonds.values())
+        
+        # Find the bonds that were broken
+        broken_bonds = ref_set - cur_set
+        broken_bonds_idx = [(idx, bond_type) for idx, (bond_type, n1, n2) in initial_Bonds.items() if tuple(sorted([n1, n2])) in broken_bonds]
+        
+        # Count each bond type
+        short_fraction, long_fraction = 0, 0
+        short, long = sorted(list(chain_lengths))
+        for idx, bond_type in broken_bonds_idx:
+            NKuhn = initial_Coeffs[bond_type][1]
+            if np.isclose(NKuhn, short):
+                short_fraction += 1
+            else:
+                long_fraction += 1
+                
+            
+        
+        
+        return short_fraction / nBonds_initial, long_fraction / nBonds_initial
+    
+    
     def compute_fractions_weak_strong(self, initial_Bonds, initial_Coeffs, strengths):
         """
         Get fraction of weak and strong broken chains.
@@ -540,22 +582,23 @@ class FracNetworkClass(NetworkClass):
         nBonds_initial = len(initial_Bonds)
         
         # Transform the edges of the graph into sets for finding the broken bonds
-        ref_set = set(tuple(sorted([n1, n2])) for idx, n1, n2 in initial_Bonds.values())
+        ref_set = set(tuple(sorted([n1, n2])) for _, n1, n2 in initial_Bonds.values())
         cur_set = set(tuple(sorted(bond)) for bond in Bonds.values())
         
         # Find the bonds that were broken
         broken_bonds = ref_set - cur_set
-        broken_bonds_idx = [idx for idx, (bond_type, n1, n2) in initial_Bonds.items() if tuple(sorted([n1, n2])) in broken_bonds]
+        broken_bonds_idx = [(idx, bond_type) for idx, (bond_type, n1, n2) in initial_Bonds.items() if tuple(sorted([n1, n2])) in broken_bonds]
         
         # Count each bond type
         weak_fraction, strong_fraction = 0, 0
         weak, strong = sorted(list(strengths))
-        for idx in broken_bonds_idx:
-            chain_strength = initial_Coeffs[initial_Bonds[idx][0]][-1]
+        for idx, bond_type in broken_bonds_idx:
+            chain_strength = initial_Coeffs[bond_type][-1]
             if np.isclose(chain_strength, weak):
                 weak_fraction += 1
             else:
                 strong_fraction += 1
+                
             
         
         

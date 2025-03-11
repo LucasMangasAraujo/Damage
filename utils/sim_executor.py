@@ -603,7 +603,6 @@ def reduce_LAMMPS_timestep(main_file):
     return
 
 
-
 def relax_multi(geometry_file, model, params, dim, temp_file, strengths, 
                             strong_fraction):
     """
@@ -646,6 +645,54 @@ def relax_multi(geometry_file, model, params, dim, temp_file, strengths,
     # Run relaxation
     run_relaxation(dim, temp_file, Boundary, model)
     return
+
+
+
+def relax_bimodal(geometry_file, model, params, dim, temp_file, chain_lengths, 
+                            long_fraction):
+    """
+    Perform relaxation on network with bimodal chain length distribution
+    
+    Inputs: 
+        geometry_file (str): path to acces as-generated network
+        model (str): chain model to be used.
+                    '1': Gaussian chain.
+                    '2': FJC (Langevin) chain.
+        params (tuple): network parameters.
+        dim (int): dimention of the problem
+        chain_lengths (tuple): chain lengths.
+        long_fraction (float): fraction of long chains.
+    
+    Outputs:
+        None
+    """
+    # Unpack tuple based on the model used
+    if int(model) == 4:
+        bKuhn, nub3, critical_r_Nb = params
+    
+    # Extract Nodes, Bonds, Boudnary and BondTypes
+    Nodes, Bonds, Boundary, BondTypes = pre.readGeometry(geometry_file)
+    rest_lengths = {idx: 0. for idx in Bonds.keys()} ## list of rest lengths (needed to write the data file)
+    
+    # Calculate computational Kuhh length
+    crosslinks = len(Nodes) - len(Boundary)
+    computational_bKuhn = np.power(nub3 /(2 * crosslinks), 1/3)
+    
+    if int(model) == 4:
+        computational_params = computational_bKuhn, 
+    
+    # Assemble
+    BondTypes = pre.sample_short_and_long(list(chain_lengths), long_fraction, critical_r_Nb,
+                                                Bonds.keys())
+    
+    # Write data file
+    pre.writePositions(temp_file, Nodes, Bonds, Boundary, BondTypes, model, computational_params, rest_lengths)
+    
+    # Run relaxation
+    run_relaxation(dim, temp_file, Boundary, model)
+    return
+
+
 
 
 

@@ -109,6 +109,69 @@ def average_fracture_results(results_dict, loading):
     return averaged_results, Wf, preStretch
 
 
+
+def average_bimodalLength_results(results_dict, loading):
+    """
+    Average the results coming from simulations with determistic
+    chain scission. Note this function is also valid for simulations
+    with one repeat. Note as well that this function is dedicated to 
+    networks having a bimodal distribution of lengths.
+    
+    Each value of the dict is formed by a tuple containing ndarrays
+    containing information in the following order.
+        stretch: value of applied stretch.
+        cauchy stress: rubbery components of stress.
+        nominal stress: nominal components of stress
+        fraction_broken_links: self explanatory.
+        damaged shear moduli: self explanatory.
+        r0: damaged end-to-end distance.
+        fraction_short: fraction of broken short chains.
+        fraction_long: fraction of broken long chains.
+    
+    Inputs:
+        results_dict (dict): results of the simulation of each repeat.
+        loading (int): Type of loading used.
+    """
+    
+    # Check if representative simulation was perfomed
+    not_one_repeat = len(results_dict.keys()) > 1
+    
+    # Perform analysis depending on the type of simulation that was done.
+    if not_one_repeat:
+        ## under dev
+        breakpoint()
+    else:
+        ## No need for averaging.
+        stretch_array = results_dict[1][0]
+        cauchy_rubbery = results_dict[1][1]
+        nominal_rubbery = results_dict[1][2]
+        fraction_broken_chains = results_dict[1][3]
+        G = results_dict[1][4]
+        r0 = results_dict[1][5]
+        fraction_broken_short = results_dict[1][6]
+        fraction_broken_long = results_dict[1][7]
+        
+        ## Calculate full stress depending on the loading conditions.
+        cauchy_stress, nominal_stress = nonZero_stress(stretch_array, cauchy_rubbery, 
+                                                        nominal_rubbery, loading)
+        
+        ## Assemble output
+        averaged_results = (stretch_array, cauchy_stress, nominal_stress, fraction_broken_chains, G, r0,
+                            fraction_broken_short, fraction_broken_long
+                            )
+        
+        ## Integrate the nominal stress-strain curve
+        Wf = FracNetworkClass.integrate_stress_strain(nominal_stress, stretch_array)
+        
+        ## Get average pre-stretch
+        preStretch_distr = results_dict[1][-1]
+        preStretch = np.sqrt(np.mean(preStretch_distr**2))
+    
+    
+    return averaged_results, Wf, preStretch
+
+
+
 def average_bimodalStrength_results(results_dict, loading):
     """
     Average the results coming from simulations with determistic
@@ -155,7 +218,9 @@ def average_bimodalStrength_results(results_dict, loading):
                                                         nominal_rubbery, loading)
         
         ## Assemble output
-        averaged_results = stretch_array, cauchy_stress, nominal_stress, fraction_broken_chains, G, r0
+        averaged_results = (stretch_array, cauchy_stress, nominal_stress, fraction_broken_chains, G, r0,
+                            fraction_broken_weak, fraction_broken_strong
+                            )
         
         ## Integrate the nominal stress-strain curve
         Wf = FracNetworkClass.integrate_stress_strain(nominal_stress, stretch_array)
