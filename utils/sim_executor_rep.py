@@ -201,6 +201,7 @@ def runsim_frac_rep(geometry_file, model, params, dim, loading, stretch_incremen
     cauchy_stress_array = FracNetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
     nominal_stress_array = FracNetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     
+    
     out = (np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), 
                 np.array(fraction_broken_chains), np.array(G_array) , np.array(r0_array),
                 preStretch_distr

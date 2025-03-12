@@ -7,7 +7,7 @@ from scipy.spatial import KDTree
 from pathlib import Path
 from collections import defaultdict
 from .network_class import FracNetworkClass
-
+from scipy import interpolate
 
 def average_cyclic_results(results_dict, loading):
     """
@@ -80,8 +80,59 @@ def average_fracture_results(results_dict, loading):
     
     # Perform analysis depending on the type of simulation that was done.
     if not_one_repeat:
-        ## under dev
-        breakpoint()
+        ## Find the number of columns (m) - assuming all matrices have the same width
+        first_key = list(results_dict.keys())[0]
+        num_cols = results_dict[first_key][0].shape[1]
+        
+        ## Find out the maximum number of points obtained in a simulatipon
+        max_rows = max(data.shape[0] for data, _ in results_dict.values())
+        
+        ## Create grid that we will interpolate
+        target_indices = np.linspace(0, 1, max_rows)
+        
+        ## Initialise some arrays
+        interpolated_matrices = []
+        Wf_array, PS_array = [], []
+        
+        ## Loop over the the results dict
+        for data, PS in results_dict.values():
+            ## Get number of rows in the data set and map
+            num_rows = data.shape[0]
+            source_indices = np.linspace(0, 1, num_rows)  # Normalize to [0,1] range
+            
+            ## Create interpolated matrix of the target size
+            interp_matrix = np.zeros((max_rows, num_cols))
+            
+            for j in range(num_cols):
+                column_data = data[:, j]
+                ## Create interpolation function for this column
+                f = interpolate.interp1d(source_indices, column_data, 
+                                         bounds_error=False, fill_value="extrapolate")
+                ## Apply interpolation to get values at target indices
+                interp_matrix[:, j] = f(target_indices)
+            
+            ## Integrate the stress strain curves
+            stretch_array, nominal_stress = data[:,0], data[:,2]
+            work_fracture = FracNetworkClass.integrate_stress_strain(nominal_stress, stretch_array)
+            Wf_array.append(work_fracture)
+            
+            ## Append the average  prestretch
+            PS_array.append(PS)
+            
+            ## Append interpolated matrix
+            interpolated_matrices.append(interp_matrix)
+        
+        ## Average results
+        stacked_matrices = np.stack(interpolated_matrices, axis=0)
+        mean_matrix = np.mean(stacked_matrices, axis=0)
+        std_matrix = np.std(stacked_matrices, axis=0) 
+        averaged_results = mean_matrix, std_matrix
+        
+        ## Average work of fracture and pre-stretch
+        preStretch = np.mean(PS_array), np.std(PS_array)
+        Wf = np.mean(Wf_array), np.std(Wf_array, ddof=1)
+        
+        
     else:
         ## No need for averaging.
         stretch_array = results_dict[1][0]
@@ -338,7 +389,10 @@ def write_results(folder_names, results_file, results_comments, results):
     results_path.mkdir(parents = True, exist_ok = True) ## check if folder exists, and create it if not
     
     # Organise data into a ndarray
-    results_matrix = np.column_stack([np.array(result) for result in results])
+    if isinstance(results, tuple):
+        results_matrix = np.column_stack([np.array(result) for result in results])
+    else:
+        results_matrix = results
     
     #  Save data to file
     np.savetxt(results_path / results_file, results_matrix, delimiter = ',', 

@@ -14,17 +14,16 @@ def main():
     # Declare parameters that are common to all simulations
     nNodes = 25 ## in thousands
     geometries_path = "..//Geometries//Chain_length//"
-    common_name = str(nNodes) + "k_nodes"
+    common_name = str(nNodes) + "k_nodes_"
     data_file = "DN.dat" ## name of LAMMPS data file
     
     # Declare if multiple repeat should be done, or representative simulations
     nRepeats = 1
-    rep_sim_flag = True ## flag indicating that a representative simulation alone should be performed
+    rep_sim_flag = False ## flag indicating that a representative simulation alone should be performed
     if rep_sim_flag:
         import utils.sim_executor_rep as sim_rep
-        results_comments = "# stretch[0], true[1], nominal[2], fraction_broken[3], G[4], r_0[5]"
-    else:
-        results_comments = "# stretch[0], true[1], nominal[2], fraction_broken[3], G[4], r_0[5]"
+    
+    results_comments = "# stretch[0], true[1], nominal[2], fraction_broken[3], G[4], r_0[5]"
     
     # Define load type and increment size
     loading = 1
@@ -66,21 +65,24 @@ def main():
         
         ## Run simulations for the specified number of repeats
         results_dict = {}
-        results_elastic = {}
         
         if not rep_sim_flag:
             for repeat in range(0, nRepeats):
+                ## Assemble geometry file
+                geometry_file = full_geom_path + common_name + str(repeat + 1) +".txt"
+                
                 ## Run full simulation
                 out = sim.runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
                                             failure_criterion, data_file)
+                
                 ## store simulation results in dict
                 results_dict[repeat + 1] = out
+                
             
         else:
             ## Assemble file and other folders or files
-            geometry_file = full_geom_path + common_name + "_1.txt"
+            geometry_file = full_geom_path + common_name + "1.txt"
             rep_folder_names = "rep_DNs", "length_effect", length_folders[i]
-            results_file = "data_rep.csv"
             
             ## Run representative simulation
             out = sim_rep.runsim_frac_rep(geometry_file, model, params, dim, loading, 
@@ -90,16 +92,26 @@ def main():
             
             
         
-        # After completion average results
+        ## After completion average results
         averaged_results, Wf, preStretch = post.average_fracture_results(results_dict, loading)
-        post.write_results(results_folder_names, results_file, results_comments, averaged_results)
         
-        # Average the work of fracture results
-        if isinstance(Wf, float):
-            PS_array.append(preStretch)
-            Wf_array.append(Wf)
+        ## Write output results depending wheter a rep simulation was range
+        if rep_sim_flag:
+            results_file = "data_rep.csv"
+            post.write_results(results_folder_names, results_file, results_comments, averaged_results)
         else:
-            breakpoint()
+            ## Save file with teh averaged data
+            results_file = "data_avg.csv"
+            post.write_results(results_folder_names, results_file, results_comments, averaged_results[0])
+            
+            ## Now for the deviations
+            results_file = "data_std.csv"
+            post.write_results(results_folder_names, results_file, results_comments, averaged_results[1])
+            
+        
+        ## Average the work of fracture results
+        PS_array.append(preStretch)
+        Wf_array.append(Wf)
         
         
         print(100 * "*")
@@ -108,11 +120,27 @@ def main():
         
     # Save results for the work of fracture
     results_folder_names = "results", "length_effect",
-    results_file = "Wf.csv"
+    results_comments = "N[0], lambda0[1], Wf[2]"
     if isinstance(Wf, float):
-        results_comments = "N[0], lambda0[1], Wf[2]"
-    averaged_results = chain_lengths, PS_array, Wf_array
-    post.write_results(results_folder_names, results_file, results_comments, averaged_results)
+        results_file = "Wf_rep.csv"
+        averaged_results = chain_lengths, PS_array, Wf_array
+        post.write_results(results_folder_names, results_file, results_comments, averaged_results)
+    else:
+        ## Get average and std
+        avg_PS = [PS[0] for PS in PS_array]
+        std_PS = [PS[1] for PS in PS_array]
+        avg_Wf = [Wf[0] for Wf in Wf_array]
+        std_Wf = [Wf[1] for Wf in Wf_array]
+        
+        ## Save the average data
+        results_file = "Wf_avg.csv"
+        averaged_results = chain_lengths, avg_PS, avg_Wf
+        post.write_results(results_folder_names, results_file, results_comments, averaged_results)
+        
+        ## Save the deviations
+        results_file = "Wf_std.csv"
+        averaged_results = chain_lengths, std_PS, std_Wf
+        post.write_results(results_folder_names, results_file, results_comments, averaged_results)
     
     return
 

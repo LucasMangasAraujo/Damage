@@ -206,10 +206,11 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
     
     # Initialise output arrays and counters
     stretch_array = []
-    cauchy_stress_array = []
+    cauchy_stress_array = [] 
     nominal_stress_array = []
     fraction_broken_chains = []
     G_array = []
+    r0_array = []
     i = 0 ## increment counter
     
     # Relax as generated network
@@ -221,8 +222,21 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
     os.system("cp %s DN_ref.dat" %data_file)
     DN_initial = FracNetworkClass("DN_ref.dat", "test.res", "main.in") ## reference configuration
     computational_params = DN_initial.get_computational_params((bKuhn, NKuhn, nub3)) ## extract computational params
-    cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_params[0], 3)
-    nominal_stress = NetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+    computational_bKuhn = computational_params[0]
+    _, ref_lengths = DN_initial.get_box()
+    
+    # Calculate rubbery stress components in the reference configuration
+    cauchy_stress = DN_initial.calculate_stress(dim) * np.power(computational_bKuhn, 3)
+    nominal_stress = FracNetworkClass.calculate_nominal_stress(dim, np.ones_like(cauchy_stress), cauchy_stress)
+    
+    # Get pre-stretch of the network, and initial rms distance
+    preStretch_distr = DN_initial.get_preStretch_distr(model)
+    avg_preStretch = np.sqrt(np.mean(preStretch_distr**2))
+    xi = DN_initial.get_interpenetration()
+    print("The average pre-stretch is %g and xi = %g" %(avg_preStretch, xi))
+    
+    # Calculare the shear modulus and initial rms end-to-end distance
+    G, rms_r0 = get_damaged_G(DN_initial, DN_initial, dim, model, computational_params[0], bKuhn, loading)
     
     # Get initial number of nodes and initial coordinates
     initial_Nodes, initial_Bonds = DN_initial.get_nodes_and_bonds()
@@ -233,10 +247,9 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
     stretch_array.append(1.)
     cauchy_stress_array.append(cauchy_stress)
     nominal_stress_array.append(nominal_stress)
-    
-    # Calculare the shear modulus
-    G = get_damaged_G(DN_initial, DN_initial, dim, model, computational_params[0], bKuhn)
     G_array.append(G)
+    r0_array.append(rms_r0)
+    
     
     # Query for initial failure
     path_exists = DN_initial.any_path(failure_criterion, initial_Nodes)
@@ -274,12 +287,14 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
                 print("Reduced increments worked!")
                 i +=1
         
-        ## Calculate current deformatio gradient
-        F = deformation_gradient(loading, stretch_array[i - 1] + stretch_increment)
-        stretch_array.append(F[0])
-        
         ## Initialise DN object
         DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object
+        
+        ## Calculate current deformatio gradient
+        stretch = DN.obtain_stretch(loading, ref_lengths)
+        F = deformation_gradient(loading, stretch)
+        stretch_array.append(stretch)
+        
         
         ## Check if scissions ocurred, and if yes, relax the network
         nBonds = len(DN.get_nodes_and_bonds()[1])
@@ -292,19 +307,21 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
         DN = FracNetworkClass(data_file, "test.res","main.in") ## Netwotk object 
         
         ## Calculate stresses
-        cauchy_stress = DN.calculate_stress(dim) * np.power(computational_params[0], 3)
+        cauchy_stress = DN.calculate_stress(dim) * np.power(computational_bKuhn, 3)
         nominal_stress = NetworkClass.calculate_nominal_stress(dim, F, cauchy_stress)
         
         ## Calculate the damaged shear modulus
         if scission_detected:
-            G = get_damaged_G(DN, DN_initial, dim, model, computational_params[0], bKuhn)
+            G, rms_r0 = get_damaged_G(DN, DN_initial, dim, model, computational_bKuhn, bKuhn, loading)
         
         ## Append current stress to the stress array
         cauchy_stress_array.append(cauchy_stress)
         nominal_stress_array.append(nominal_stress)
         G_array.append(G)
+        r0_array.append(rms_r0)
         
         ## Print currrent step data
+        print("The chain parameters are b = %g, N = %g, rNb_crit = %g" %(computational_bKuhn, NKuhn, critical_r_Nb))
         print("F_11 = %g, F_22 = %g, F_33 = %g" %tuple(F))
         print("S_11 = %g, S_22 = %g, S_33 = %g" %tuple(cauchy_stress))
         print("P_11 = %g, P_22 = %g, P_33 = %g" %tuple(nominal_stress))
@@ -332,9 +349,17 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
     cauchy_stress_array = NetworkClass.render_stress_units(np.array(cauchy_stress_array), bKuhn)
     nominal_stress_array = NetworkClass.render_stress_units(np.array(nominal_stress_array), bKuhn)
     
-    out = (np.array(stretch_array), np.array(cauchy_stress_array), np.array(nominal_stress_array), 
-            np.array(fraction_broken_chains), np.array(G_array)
-            )
+    # Find the non zero stress component based on the loading
+    cauchy, nominal = post.nonZero_stress(stretch_array, cauchy_stress_array, 
+                                                                nominal_stress_array, loading)
+    
+    # Assemble data matrix and returhn simulation results
+    data_tuple = (np.array(stretch_array), np.array(cauchy), np.array(nominal), 
+                    np.array(fraction_broken_chains), np.array(G_array) , 
+                    np.array(r0_array) )
+    data_matrix = np.column_stack(data_tuple, )
+    
+    out = data_matrix, np.sqrt(np.mean(preStretch_distr **2))
     
     return out
 

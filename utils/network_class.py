@@ -14,7 +14,8 @@ class NetworkClass:
     This is the parent class, defining methods that are general for
     all types of networks
     """
-
+    
+    
     def __init__(self, data_file, dump_file, input_file):
         """
         Class constructor
@@ -28,6 +29,33 @@ class NetworkClass:
         self.data_file = data_file
         self.dump_file = dump_file
         self.input_file = input_file
+    
+    
+    def obtain_stretch(self, loading, ref_lengths):
+        """
+        Obtain stretch based on the box dimension and load type
+        
+        Inputs:
+            loading (int): type of loading. See runinc in sim_executor 
+                           for details.
+           ref_lengths (dict): lengths of the reference configuration.
+       
+       Outputs:
+            stretch (float): stretch charactherising the load.
+        """
+        
+        # Get the box dimension 
+        box_boundaries, box_lengths = self.get_box()
+        
+        if loading == 1:
+            Lx0 = ref_lengths['x']
+            Lx = box_lengths['x']
+            stretch = Lx / Lx0
+        
+        
+        
+        return stretch
+    
     
     
     def get_avg_preStretch(self, model):
