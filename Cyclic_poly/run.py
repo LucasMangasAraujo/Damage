@@ -20,7 +20,8 @@ def main():
     data_file = "DN.dat"
     nRepeats = 1
     rep_sim_flag = True ## flag indicating that a representative simulation alone should be performed
-    
+    if rep_sim_flag:
+        import utils.sim_executor_rep as sim_rep 
     
     # Declare chain parameters
     bKuhn, NKuhn = (1, 100)## Kuhn length (nm) and Number of Kuhn segments
@@ -37,10 +38,9 @@ def main():
     
     # Define strengths to be tested
     strengths = 0.4, 0.8
-    strong_fractions = 0.0, 0.3, 0.5, 0.7, 1.0
+    strong_fractions = 0.5, 
     
     ## Define the peak stresses
-    peak_stretches = (1.5, 2.0, 2.3),  (2, 4, 8.), (4, 5, 6), (5, 5.5, 6.0)
     peak_fractions = (0.5, 0.7, 0.9)
     
     for k, phi in enumerate(strong_fractions):
@@ -81,9 +81,9 @@ def main():
             peak_stretches = find_peak_stretches(phi, peak_fractions, monotonic_path)
             
             ## Run representative simulation
-            out = sim.runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_increment, 
-                                                peak_stretches, failure_criterion, data_file, strengths, 
-                                                phi, rep_folder_names)
+            out = sim_rep.runsim_cyclic_multi_rep(geometry_file, model, params, dim, loading, stretch_increment, 
+                                                    peak_stretches, failure_criterion, data_file, strengths, 
+                                                    phi, rep_folder_names)
             results_dict[1] = out
             
             

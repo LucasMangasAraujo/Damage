@@ -209,8 +209,6 @@ class NetworkClass:
         return np.array(preStretch_distr)
     
     
-    
-    
     @staticmethod
     def get_bond_coeffs_lines(data_file):
         """
@@ -354,6 +352,68 @@ class NetworkClass:
         
         
         return distances
+
+
+    def get_forces(self, model):
+        """
+        Get chain forces
+        """
+        # Get coefficients and bonds
+        Bonds, Coeffs = self.get_bonds_and_coeffs(model)
+        Nodes, _ = self.get_nodes_and_bonds()
+        
+        # Loop
+        fbkT = []
+        for idx, (bond_type, n1, n2) in Bonds.items():
+            dist = np.linalg.norm(Nodes[n1] - Nodes[n2])
+            if model == "4":
+                bKuhn, NKuhn, critical_rNb = Coeffs[bond_type]
+                rNb = dist / (NKuhn * bKuhn)
+                fbkT.append(NetworkClass.invLangevin(rNb))
+        
+        
+        return np.array(fbkT)
+
+
+    def get_bonds_and_coeffs(self, model):
+        """
+        Get bonds and their coefficients
+        """
+        
+        # Read data file
+        with open(self.data_file,"r") as f:
+            ## Get the Bond types and their coefficients
+            key = f.readline()
+            while "Bond Coeffs" not in key:
+                key = f.readline()
+            
+            BondCoeffs = {}
+            f.readline()
+            data = f.readline().strip("\n").split(" ")
+            while len(data) > 1:
+                if model == '4':
+                    BondCoeffs[int(data[0])] = float(data[1]), float(data[2]), float(data[3])
+                
+                data = f.readline().strip("\n").split(" ")
+            
+            
+            ## Keep readin until bond section is reached
+            key = f.readline()
+            while "Bonds" not in key:
+                key = f.readline()
+            f.readline()
+            
+            ## Read bonds
+            Bonds = {}
+            data = f.readline().strip("\n").split(" ")
+            while len(data) > 1:
+                Bonds[int(data[0])] = int(data[1]), int(data[2]), int(data[3])
+                data = f.readline().strip("\n").split(" ")
+        
+        
+        return Bonds, BondCoeffs
+
+
 
     def get_nodes_and_bonds(self):
         """
@@ -540,7 +600,18 @@ class NetworkClass:
         # Convert to kPa
         stress_kPa = stress_J_over_nm3 * 1e24
         return stress_kPa
+    
+    
+    @staticmethod
+    def invLangevin(x):
+        
+        #Pade approximation of the inverse Langevin function
+        #cf. Cohen 1991
 
+        invL = x*(3.-(x**2))/(1.-(x**2))
+
+        return invL
+    
 
 class FracNetworkClass(NetworkClass):
     """
@@ -548,6 +619,34 @@ class FracNetworkClass(NetworkClass):
     Inherented from the NetworkClass.
     
     """
+    
+    def get_forces_weak_strong(self, model, strengths):
+        """
+        Get chain forces
+        """
+        # Get coefficients and bonds
+        Bonds, Coeffs = self.get_bonds_and_coeffs(model)
+        Nodes, _ = self.get_nodes_and_bonds()
+        
+        # Extract weak and strong 
+        weak, strong = sorted(list(strengths))
+        
+        # Loop
+        fbkT_weak, fbkT_strong = [], []
+        for idx, (bond_type, n1, n2) in Bonds.items():
+            dist = np.linalg.norm(Nodes[n1] - Nodes[n2])
+            if model == "4":
+                bKuhn, NKuhn, critical_rNb = Coeffs[bond_type]
+                rNb = dist / (NKuhn * bKuhn)
+                if np.isclose(critical_rNb, weak):
+                    fbkT_weak.append(NetworkClass.invLangevin(rNb))
+                else:
+                    fbkT_strong.append(NetworkClass.invLangevin(rNb))
+        
+        
+        return np.array(fbkT_weak), np.array(fbkT_strong)
+    
+    
     
     def compute_fractions_short_long(self, initial_Bonds, initial_Coeffs, chain_lengths):
         """
@@ -658,45 +757,6 @@ class FracNetworkClass(NetworkClass):
         
         return G
     
-    
-    
-    def get_bonds_and_coeffs(self, model):
-        """
-        Get bonds and their coefficients
-        """
-        
-        # Read data file
-        with open(self.data_file,"r") as f:
-            ## Get the Bond types and their coefficients
-            key = f.readline()
-            while "Bond Coeffs" not in key:
-                key = f.readline()
-            
-            BondCoeffs = {}
-            f.readline()
-            data = f.readline().strip("\n").split(" ")
-            while len(data) > 1:
-                if model == '4':
-                    BondCoeffs[int(data[0])] = float(data[1]), float(data[2]), float(data[3])
-                
-                data = f.readline().strip("\n").split(" ")
-            
-            
-            ## Keep readin until bond section is reached
-            key = f.readline()
-            while "Bonds" not in key:
-                key = f.readline()
-            f.readline()
-            
-            ## Read bonds
-            Bonds = {}
-            data = f.readline().strip("\n").split(" ")
-            while len(data) > 1:
-                Bonds[int(data[0])] = int(data[1]), int(data[2]), int(data[3])
-                data = f.readline().strip("\n").split(" ")
-        
-        
-        return Bonds, BondCoeffs
     
     @staticmethod
     def integrate_stress_strain(nominal_stress, stretch):

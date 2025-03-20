@@ -45,7 +45,7 @@ def main():
     ## Initliase the array for storing information
     Wf_array = [] ## array to store the densities
     PS_array = [] ## array to store the pre-stretches
-    
+    max_array = [] ## array to store the failure stretches
     
     
     for i, NKuhn in enumerate(chain_lengths):
@@ -92,14 +92,17 @@ def main():
             
             
         
-        ## After completion average results
-        averaged_results, Wf, preStretch = post.average_fracture_results(results_dict, loading)
-        
-        ## Write output results depending wheter a rep simulation was range
+        ## Write output results depending wheter a rep simulation was selected
         if rep_sim_flag:
+            ## After completion average results
+            averaged_results, Wf, preStretch = post.average_fracture_results(results_dict, loading)
+            
             results_file = "data_rep.csv"
             post.write_results(results_folder_names, results_file, results_comments, averaged_results)
         else:
+            ## Average the results
+            averaged_results, Wf, preStretch, max_stretch = post.average_fracture_results(results_dict, loading)
+            
             ## Save file with teh averaged data
             results_file = "data_avg.csv"
             post.write_results(results_folder_names, results_file, results_comments, averaged_results[0])
@@ -112,6 +115,7 @@ def main():
         ## Average the work of fracture results
         PS_array.append(preStretch)
         Wf_array.append(Wf)
+        max_array.append(max_stretch)
         
         
         print(100 * "*")
@@ -120,7 +124,7 @@ def main():
         
     # Save results for the work of fracture
     results_folder_names = "results", "length_effect",
-    results_comments = "N[0], lambda0[1], Wf[2]"
+    results_comments = "N[0], lambda0[1], Wf[2], lambda_max[3]"
     if isinstance(Wf, float):
         results_file = "Wf_rep.csv"
         averaged_results = chain_lengths, PS_array, Wf_array
@@ -131,15 +135,17 @@ def main():
         std_PS = [PS[1] for PS in PS_array]
         avg_Wf = [Wf[0] for Wf in Wf_array]
         std_Wf = [Wf[1] for Wf in Wf_array]
+        avg_max = [max_stretch[0] for max_stretch in max_array]
+        std_max = [max_stretch[1] for max_stretch in max_array]
         
         ## Save the average data
         results_file = "Wf_avg.csv"
-        averaged_results = chain_lengths, avg_PS, avg_Wf
+        averaged_results = chain_lengths, avg_PS, avg_Wf, avg_max
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
         
         ## Save the deviations
         results_file = "Wf_std.csv"
-        averaged_results = chain_lengths, std_PS, std_Wf
+        averaged_results = chain_lengths, std_PS, std_Wf, std_max
         post.write_results(results_folder_names, results_file, results_comments, averaged_results)
     
     return

@@ -37,6 +37,7 @@ def reverse_load(peak, stretch, previous_stretch_increment):
     Check if peak was reached
     """
     # Check if peak was reached
+    
     if np.isclose(peak, stretch):
         ## Invert loading direction and set peak flag to true
         current_stretch_increment = -previous_stretch_increment

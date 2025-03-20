@@ -9,6 +9,60 @@ from collections import defaultdict
 from .network_class import FracNetworkClass
 from scipy import interpolate
 
+
+def average_cyclic_bimodalLength_results(results_dict, loading):
+    """
+    Average the results coming from cyclic simulations 
+    with determistic chain scission. Note this function is 
+    also valid for simulations with one repeat.
+    
+    Each value of the dict is formed by a tuple containing ndarrays
+    containing information in the following order.
+        stretch: value of applied stretch.
+        cauchy stress: rubbery components of stress.
+        nominal stress: nominal components of stress
+        fraction_broken_links: self explanatory.
+        damaged shear moduli: self explanatory.
+    
+    Inputs:
+        results_dict (dict): results of the simulation of each repeat.
+        loading (int): Type of loading used.
+    """
+    
+    # Check if representative simulation was perfomed
+    not_one_repeat = len(results_dict.keys()) > 1
+    
+    # Perform analysis depending on the type of simulation that was done.
+    if not_one_repeat:
+        ## under dev
+        breakpoint()
+    else:
+        ## No need for averaging.
+        stretch_array = results_dict[1][0]
+        cauchy_rubbery = results_dict[1][1]
+        nominal_rubbery = results_dict[1][2]
+        fraction_broken_chains = results_dict[1][3]
+        G = results_dict[1][4]
+        r0 = results_dict[1][5]
+        fraction_broken_short = results_dict[1][6]
+        fraction_broken_long = results_dict[1][7]
+        
+        ## Calculate full stress depending on the loading conditions.
+        cauchy_stress, nominal_stress = nonZero_stress(stretch_array, cauchy_rubbery, 
+                                                        nominal_rubbery, loading)
+        
+        ## Assemble output
+        averaged_results = (stretch_array, cauchy_stress, nominal_stress, fraction_broken_chains, G, r0,
+                            fraction_broken_short, fraction_broken_long
+                            )
+        
+    
+    
+    return averaged_results
+
+
+
+
 def average_cyclic_results(results_dict, loading):
     """
     Average the results coming from cyclic simulations 
@@ -42,6 +96,7 @@ def average_cyclic_results(results_dict, loading):
         nominal_rubbery = results_dict[1][2]
         fraction_broken_chains = results_dict[1][3]
         G = results_dict[1][4]
+        #r0 = results_dict[1][5]
         
         ## Calculate full stress depending on the loading conditions.
         cauchy_stress, nominal_stress = nonZero_stress(stretch_array, cauchy_rubbery, 
@@ -84,32 +139,64 @@ def average_fracture_results(results_dict, loading):
         first_key = list(results_dict.keys())[0]
         num_cols = results_dict[first_key][0].shape[1]
         
-        ## Find out the maximum number of points obtained in a simulatipon
-        max_rows = max(data.shape[0] for data, _ in results_dict.values())
+        ## Determine the overlapping range of stretch values
+        min_stretches = []
+        max_stretches = []
+        for data, _ in results_dict.values():
+            min_stretches.append(np.min(data[:, 0]))  # Assuming stretch is the first column
+            max_stretches.append(np.max(data[:, 0]))
         
-        ## Create grid that we will interpolate
-        target_indices = np.linspace(0, 1, max_rows)
+        ## Use common range where we have enough data points
+        common_min_stretch = np.percentile(min_stretches, 75)  # Take the 75th percentile of minimum values
+        common_max_stretch = np.percentile(max_stretches, 25)  # Take the 25th percentile of maximum values
+        
+        ## If the common range is too small, fallback to a more inclusive range
+        if common_max_stretch <= common_min_stretch:
+            common_min_stretch = np.median(min_stretches)
+            common_max_stretch = np.median(max_stretches)
+        
+        ## Find out the maximum number of points to use for the common grid
+        median_density = []
+        for data, _ in results_dict.values():
+            stretch_range = np.max(data[:, 0]) - np.min(data[:, 0])
+            median_density.append(data.shape[0] / stretch_range)
+        
+        median_pts_per_unit = np.median(median_density)
+        target_points = int(median_pts_per_unit * (common_max_stretch - common_min_stretch))
+        target_points = max(50, target_points)  # Ensure at least 50 points
+        
+        ## Create grid that we will interpolate (using the common stretch range)
+        target_stretch = np.linspace(common_min_stretch, common_max_stretch, target_points)
         
         ## Initialise some arrays
         interpolated_matrices = []
-        Wf_array, PS_array = [], []
+        Wf_array, PS_array, max_array = [], [], []
+        valid_data_counts = np.zeros(target_points)
         
         ## Loop over the the results dict
         for data, PS in results_dict.values():
-            ## Get number of rows in the data set and map
-            num_rows = data.shape[0]
-            source_indices = np.linspace(0, 1, num_rows)  # Normalize to [0,1] range
-            
             ## Create interpolated matrix of the target size
-            interp_matrix = np.zeros((max_rows, num_cols))
+            interp_matrix = np.zeros((target_points, num_cols))
             
-            for j in range(num_cols):
-                column_data = data[:, j]
-                ## Create interpolation function for this column
-                f = interpolate.interp1d(source_indices, column_data, 
-                                         bounds_error=False, fill_value="extrapolate")
-                ## Apply interpolation to get values at target indices
-                interp_matrix[:, j] = f(target_indices)
+            ## Find the valid data within the common range
+            valid_idx = (data[:, 0] >= common_min_stretch) & (data[:, 0] <= common_max_stretch)
+            valid_data = data[valid_idx]
+            
+            
+            ## Place stretch directly in interpolated matrix, and interpolate the rest
+            interp_matrix[:, 0] = target_stretch  # Set the stretch column directly
+            for j in range(1, num_cols):  # Start from column 1
+                f = interpolate.interp1d(
+                        valid_data[:, 0],  # Use stretch as x values
+                        valid_data[:, j],  # Use the current column as y values
+                        kind='linear',     # Use linear interpolation for robustness
+                        bounds_error=False,
+                        fill_value=np.nan  # Mark out-of-bounds values as NaN
+                    )
+                interp_matrix[:, j] = f(target_stretch)
+            
+            ## Keep track of how many valid data points we have at each position
+            valid_data_counts += ~np.isnan(interp_matrix[:, 1])  # Use the first non-stretch column
             
             ## Integrate the stress strain curves
             stretch_array, nominal_stress = data[:,0], data[:,2]
@@ -121,17 +208,29 @@ def average_fracture_results(results_dict, loading):
             
             ## Append interpolated matrix
             interpolated_matrices.append(interp_matrix)
+            
+            ## Append failure stretch
+            max_array.append(data[:,0].max())
         
         ## Average results
         stacked_matrices = np.stack(interpolated_matrices, axis=0)
-        mean_matrix = np.mean(stacked_matrices, axis=0)
-        std_matrix = np.std(stacked_matrices, axis=0) 
+        mean_matrix = np.nanmean(stacked_matrices, axis=0)
+        std_matrix = np.nanstd(stacked_matrices, axis=0)
+        
+        ## Removed invalid entrries#
+        valid_rows = ~np.isnan(mean_matrix[:, 1])  # Check first non-stretch column
+        mean_matrix = mean_matrix[valid_rows]
+        std_matrix = std_matrix[valid_rows]
+        
+        ## Assemble averaged results
         averaged_results = mean_matrix, std_matrix
         
         ## Average work of fracture and pre-stretch
         preStretch = np.mean(PS_array), np.std(PS_array)
-        Wf = np.mean(Wf_array), np.std(Wf_array, ddof=1)
+        Wf = np.mean(Wf_array), np.std(Wf_array)
+        max_stretch = np.mean(max_array), np.std(max_array)
         
+        return averaged_results, Wf, preStretch, max_stretch
         
     else:
         ## No need for averaging.
@@ -155,9 +254,9 @@ def average_fracture_results(results_dict, loading):
         ## Get average pre-stretch
         preStretch_distr = results_dict[1][-1]
         preStretch = np.sqrt(np.mean(preStretch_distr**2))
-    
-    
-    return averaged_results, Wf, preStretch
+        
+        
+        return averaged_results, Wf, preStretch
 
 
 

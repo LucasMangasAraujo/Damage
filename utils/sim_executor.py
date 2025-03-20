@@ -300,7 +300,7 @@ def runsim_frac(geometry_file, model, params, dim, loading, stretch_increment,
         nBonds = len(DN.get_nodes_and_bonds()[1])
         scission_detected = nBonds < nBonds_beginning
         if scission_detected:
-            nBonds = relax_unitl_no_scissions(data_file, dim, "main.in", nBonds_beginning)
+            nBonds = relax_until_no_scissions(data_file, dim, "main.in", nBonds_beginning)
             nBonds_beginning = nBonds
         
         ## Update DN object
@@ -516,7 +516,7 @@ def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_a
         else:
             ## Check if scissions ocurred during the reduced increment
             print("Reduced increment worked!")
-            out = relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning)
+            out = relax_until_no_scissions(data_file, dim, main_file, nBonds_beginning)
             current_inc += reduced_inc
     
     ## Check if reducing stretch increment process failed, if yes repeat 
@@ -530,7 +530,7 @@ def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_a
             else:
                 ## Check if scissions ocurred during the reduced increment
                 print("Reduced increment in stretch and time worked!")
-                out = relax_unitl_no_scissions(data_file, dim, "small_step.in", nBonds_beginning)
+                out = relax_until_no_scissions(data_file, dim, "small_step.in", nBonds_beginning)
                 current_inc += reduced_inc
                 
             
@@ -539,7 +539,7 @@ def run_reduced_inc(data_file, stretch_increment, loading, dim, main_file, max_a
     return err
 
 
-def relax_unitl_no_scissions(data_file, dim, main_file, nBonds_beginning):
+def relax_until_no_scissions(data_file, dim, main_file, nBonds_beginning):
     """
     Relax the network after defomation until scissions are not detected
     anymore.
